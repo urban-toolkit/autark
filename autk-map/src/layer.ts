@@ -34,6 +34,12 @@ export abstract class Layer {
     protected _renderInfoIsDirty = false;
     /** Indicates that geometry/data buffers must be refreshed on the GPU. */
     protected _dataIsDirty = false;
+    private _pickingRevision = 0;
+
+    /** Changes when geometry or per-feature visibility changes picking pixels. */
+    get pickingRevision(): number { return this._pickingRevision; }
+
+    protected invalidatePicking(): void { this._pickingRevision++; }
     /** Callback run whenever the layer marks its data or render state dirty. */
     private _onChange: (() => void) | null = null;
 
@@ -125,8 +131,8 @@ export abstract class Layer {
         }
 
         // Keep picking state coherent with layer capabilities.
-        if ('isPick' in nextInfo && nextInfo.isPick === true && !canPick) {
-            nextInfo.isPick = false;
+        if ('isClick' in nextInfo && nextInfo.isClick === true && !canPick) {
+            nextInfo.isClick = false;
             nextInfo.pickedComps = undefined;
         }
 
@@ -154,7 +160,8 @@ export abstract class Layer {
      */
     makeLayerDataDirty(): void {
         this._dataIsDirty = true;
-        this._onChange?.();
+        this.invalidatePicking();
+        this.notifyChange();
     }
 
     /**
@@ -165,6 +172,11 @@ export abstract class Layer {
      */
     makeLayerRenderInfoDirty(): void {
         this._renderInfoIsDirty = true;
+        this.notifyChange();
+    }
+
+    /** Schedules a frame for changes tracked by a subclass. */
+    protected notifyChange(): void {
         this._onChange?.();
     }
 
@@ -221,16 +233,6 @@ export abstract class Layer {
     renderPickingPass(_camera: Camera, _passEncoder?: GPURenderPassEncoder): void {}
 
     /**
-     * Clears all highlighted features.
-     *
-     * Layers that support highlighting should override this to remove any
-     * current highlight selection. The base implementation is a no-op.
-     *
-     * @returns Clears highlight state when supported. Otherwise does nothing.
-     */
-    clearHighlightedIds(): void {}
-
-    /**
      * Replaces the highlighted feature selection.
      *
      * Layers that support highlighting should interpret the provided component
@@ -240,7 +242,7 @@ export abstract class Layer {
      * @param _ids Component ids to highlight.
      * @returns Updates highlight state when supported. Otherwise does nothing.
      */
-    setHighlightedIds(_ids: number[]): void {}
+    setSelection(_ids: number[]): void {}
 
     /**
      * Applies a skip mask to the provided component ids.
@@ -252,19 +254,7 @@ export abstract class Layer {
      * @returns Updates the layer's skip mask when supported. Otherwise does
      * nothing.
      */
-    setSkippedIds(_ids: number[]): void {}
-
-    /**
-     * Clears the skip mask.
-     *
-     * Layers that implement skipped-component handling should override this to
-     * restore normal rendering for all components. The base implementation is a
-     * no-op.
-     *
-     * @returns Clears skipped-component state when supported. Otherwise does
-     * nothing.
-     */
-    clearSkippedIds(): void {}
+    setSkipped(_ids: number[]): void {}
 
     /**
      * Releases resources owned by this layer.

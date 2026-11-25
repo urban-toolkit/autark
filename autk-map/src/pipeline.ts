@@ -363,7 +363,7 @@ export abstract class Pipeline {
                 ColorMap.getSamplingDomain(scale, computedDomain),
             ),
             useColorMap: Boolean(layer.layerRenderInfo.isColorMap),
-            useHighlight: Boolean(layer.layerRenderInfo.isPick),
+            useHighlight: Boolean(layer.layerRenderInfo.isClick),
             opacity: layer.layerRenderInfo.opacity,
         };
 

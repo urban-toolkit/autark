@@ -189,6 +189,10 @@ export class TerrainRenderer {
     private surfaceMesh: TerrainMesh | null = null;
     private surfaceGeometry: TerrainSurfaceMesh | null = null;
     private surfaceSources: TerrainSurfaceGeometry[] | null = null;
+    private _surfaceRevision = 0;
+
+    /** Changes when a different surface mesh changes terrain occlusion. */
+    get surfaceRevision(): number { return this._surfaceRevision; }
     private get activeMesh(): TerrainMesh { return this.surfaceMesh ?? this.mesh; }
     /** CPU-side instance upload buffer for terrain block metadata. */
     private readonly instanceData = new Float32Array(MAX_INSTANCES * 8);
@@ -530,6 +534,7 @@ export class TerrainRenderer {
         this.surfaceMesh?.lineIndexBuffer.destroy();
         this.surfaceMesh = mesh;
         this.surfaceGeometry = geometry;
+        this._surfaceRevision++;
         // Layer geometry uses prototype getters, which object spread does not copy.
         this.surfaceSources = sources === null ? null : sources.map(source => ({
             position: source.position, indices: source.indices, skippedVertices: source.skippedVertices.slice(),

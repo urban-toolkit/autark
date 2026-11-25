@@ -112,33 +112,43 @@ export class PipelinePolyline extends Pipeline {
         this._attributesData = this._syncFloatData(this._attributesData, layer.polylineAttributes);
         this._indicesData = this._syncUintData(this._indicesData, layer.indices);
         this._indexCount = layer.indices.length;
+        const queue = this._renderer.device.queue;
+        queue.writeBuffer(this._positionBuffer, 0, this._positionData);
+        queue.writeBuffer(this._attributesBuffer, 0, this._attributesData);
+        queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(layer);
+        // Geometry replacement can change component ranges even when styles stay the same.
+        this._widthsData = null;
+        this.updateWidth(layer);
+    }
+
+    /** Uploads feature state without touching geometry or widths. */
+    updateFeatureState(layer: PolylineLayer): void {
         const count = layer.position.length / 2;
         this._stateData = this._syncFloatLength(this._stateData, count * 4);
+        // Reading the hover-aware mask can rebuild it for the whole layer.
+        const highlights = this.picking ? undefined : layer.highlightedVertices;
         for (let component = 0; component < layer.components.length; component++) {
             const start = component === 0 ? 0 : layer.components[component - 1].nPoints;
             const end = layer.components[component].nPoints;
             const id = component + 1;
             for (let i = start; i < end; i++) {
                 this._stateData[i * 4] = this.picking ? (id & 0xff) / 255 : layer.thematic[i];
-                this._stateData[i * 4 + 1] = this.picking ? ((id >> 8) & 0xff) / 255 : layer.highlightedVertices[i];
+                this._stateData[i * 4 + 1] = highlights === undefined ? ((id >> 8) & 0xff) / 255 : highlights[i];
                 this._stateData[i * 4 + 2] = this.picking ? ((id >> 16) & 0xff) / 255 : layer.thematicValidity[i];
                 this._stateData[i * 4 + 3] = layer.skippedVertices[i];
             }
         }
-        const queue = this._renderer.device.queue;
-        queue.writeBuffer(this._positionBuffer, 0, this._positionData);
-        queue.writeBuffer(this._attributesBuffer, 0, this._attributesData);
-        queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
-        queue.writeBuffer(this._stateBuffer, 0, this._stateData);
-        // Geometry replacement can change component ranges even when styles stay the same.
-        this._widthsData = null;
-        this.updateWidth(layer);
+        this._renderer.device.queue.writeBuffer(this._stateBuffer, 0, this._stateData);
     }
 
     /** Updates only render-state resources; a uniform override never reuploads geometry. */
     updateWidth(layer: PolylineLayer): void {
-        this._widthData[0] = layer.layerRenderInfo.polylinesWidth ?? 0;
-        this._renderer.device.queue.writeBuffer(this._widthBuffer, 0, this._widthData);
+        const override = Math.fround(layer.layerRenderInfo.polylinesWidth ?? 0);
+        if (override !== this._widthData[0]) {
+            this._widthData[0] = override;
+            this._renderer.device.queue.writeBuffer(this._widthBuffer, 0, this._widthData);
+        }
         const widths = layer.layerRenderInfo.polylinesWidthByComponent;
         if (this._widthsData && widths === this._defaultWidths) { return; }
         this._defaultWidths = widths;

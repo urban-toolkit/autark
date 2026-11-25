@@ -7,7 +7,7 @@
  * the same way.
  */
 
-import { EventEmitter } from '@urban-toolkit/autk-core';
+import { EventEmitter, type Camera } from '@urban-toolkit/autk-core';
 
 import { Layer } from './layer';
 import { LayerManager } from './layer-manager';
@@ -46,10 +46,39 @@ export type PendingPick = {
  */
 export class MapPickingController {
     private hoverRequest: PendingPick | null = null;
+    private hoverInFlight = false;
+    private cachedPick?: {
+        layer: Layer;
+        texture: GPUTexture;
+        passVersion: number;
+        geometryRevision: number;
+        defaultWidths: Layer['layerRenderInfo']['polylinesWidthByComponent'];
+        terrain: object | undefined;
+        view: number[];
+    };
 
     queueHover(request: PendingPick | null): void {
         this.hoverRequest = request;
-        if (request) this.requestRender();
+        if (request && !this.hoverInFlight) this.requestRender();
+    }
+
+    /** Releases the cached layer or terrain after removal or reconfiguration. */
+    invalidatePickCache(): void { this.cachedPick = undefined; }
+
+    /** Reuses the single picking target while its layer, projection, and visibility are unchanged. */
+    renderPickIfNeeded(pick: PendingPick, camera: Camera, draw: () => void, terrain?: object, terrainView: readonly number[] = []): void {
+        const { layer } = pick;
+        const texture = this.renderer.pickingTexture;
+        const geometryRevision = layer.pickingRevision;
+        const { pointSize, polylinesWidth, polylinesWidthByComponent: defaultWidths } = layer.layerRenderInfo;
+        const view = [...camera.getModelViewMatrix(), ...camera.getProjectionMatrix(), pointSize ?? 0, polylinesWidth ?? 0, ...terrainView];
+        const cached = this.cachedPick;
+        if (cached && cached.layer === layer && cached.texture === texture && cached.passVersion === this.renderer.pickingPassVersion
+            && cached.geometryRevision === geometryRevision && cached.defaultWidths === defaultWidths && cached.terrain === terrain
+            && cached.view.length === view.length && view.every((value, index) => cached.view[index] === value)) return;
+
+        draw();
+        this.cachedPick = { layer, texture, passVersion: this.renderer.pickingPassVersion, geometryRevision, defaultWidths, terrain, view };
     }
     /**
      * Creates a picking controller bound to a renderer and event bus.
@@ -84,23 +113,24 @@ export class MapPickingController {
      * if (pending) renderPickingPass(pending);
      */
     consumePendingPick(): PendingPick | null {
-        const activePickingLayer = this.layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
-        if (!activePickingLayer || activePickingLayer.layerRenderInfo.isSkip || !activePickingLayer.layerRenderInfo.pickedComps) {
+        const activeClickLayer = this.layerManager.layers.find((layer) => layer.layerRenderInfo.isClick) ?? null;
+        if (!activeClickLayer || activeClickLayer.layerRenderInfo.isSkip || !activeClickLayer.layerRenderInfo.pickedComps) {
+            if (this.hoverInFlight) return null;
             const hover = this.hoverRequest;
             this.hoverRequest = null;
             return hover;
         }
 
-        if (this.hoverRequest) this.requestRender();
-        const [x, y] = activePickingLayer.layerRenderInfo.pickedComps;
-        activePickingLayer.layerRenderInfo.pickedComps = undefined;
+        if (this.hoverRequest && !this.hoverInFlight) this.requestRender();
+        const [x, y] = activeClickLayer.layerRenderInfo.pickedComps;
+        activeClickLayer.layerRenderInfo.pickedComps = undefined;
 
-        if (!(activePickingLayer instanceof VectorLayer) && !(activePickingLayer instanceof SpriteLayer)) {
-            activePickingLayer.clearHighlightedIds();
+        if (!(activeClickLayer instanceof VectorLayer) && !(activeClickLayer instanceof SpriteLayer)) {
+            activeClickLayer.setSelection([]);
             return null;
         }
 
-        return { layer: activePickingLayer, pickableLayer: activePickingLayer, x, y };
+        return { layer: activeClickLayer, pickableLayer: activeClickLayer, x, y };
     }
 
     /**
@@ -115,7 +145,8 @@ export class MapPickingController {
     enqueuePickingReadback(pendingPick: PendingPick): number | null {
         const pickReadbackSlot = this.renderer.reservePickingReadbackSlot(1);
         if (pickReadbackSlot === null) {
-            if (!pendingPick.onHover) console.warn('Picking readback buffers are still busy; skipping this picking frame.');
+            if (pendingPick.onHover) this.hoverRequest ??= pendingPick;
+            else console.warn('Picking readback buffers are still busy; skipping this picking frame.');
             return null;
         }
 
@@ -141,6 +172,7 @@ export class MapPickingController {
             return;
         }
 
+        if (pendingPick.onHover) this.hoverInFlight = true;
         this.renderer.readPickingResults(pickReadbackSlot, 1).then((ids) => {
             const id = ids[0] ?? -1;
             const { layer, pickableLayer, onHover } = pendingPick;
@@ -150,9 +182,12 @@ export class MapPickingController {
             }
 
             if (id >= 0) pickableLayer.toggleHighlightedIds([id]);
-            else layer.clearHighlightedIds();
+            else layer.setSelection([]);
             const payload = { selection: pickableLayer.highlightedIds, layerId: layer.layerInfo.id };
             this.mapEvents.emit(MapEvent.CLICK, payload);
+        }).finally(() => {
+            if (pendingPick.onHover) this.hoverInFlight = false;
+            if (this.hoverRequest && !this.hoverInFlight) this.requestRender();
         });
     }
 }

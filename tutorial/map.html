@@ -389,10 +389,10 @@
   <p><code>autk-map</code> exposes three complementary interaction mechanisms. They share the same render-info flags and the same event bus, so they can be combined in any order:</p>
   <ul>
     <li><strong>Picking</strong>: pointer-driven selection that emits events through <code>map.events.on()</code>.</li>
-    <li><strong>Programmatic highlight and skip</strong>: direct control over which components stand out (<code>setHighlightedIds()</code>) or are hidden (<code>setSkippedIds()</code>).</li>
+    <li><strong>Programmatic highlight and skip</strong>: direct control over which components stand out (<code>setSelection()</code>) or are hidden (<code>setSkipped()</code>).</li>
     <li><strong>Layer visibility</strong>: show, hide or fully remove a layer (<code>isSkip</code> in <code>updateRenderInfo()</code>, <code>removeLayer()</code>).</li>
   </ul>
-  <p>Enable picking on a layer with <code>isPick: true</code>, then double-click a neighborhood. <code>MapEvent.CLICK</code> delivers <code>{layerId, selection}</code>, where <code>selection</code> holds indices into the original collection. The cell highlights the picked features and lists their names; use the buttons to hide or restore the picked ones. The same selection arrays are what <code>autk-plot</code> emits and consumes, which is how maps and charts are linked.</p>
+  <p>Enable picking on a layer with <code>isClick: true</code>, then double-click a neighborhood. <code>MapEvent.CLICK</code> delivers <code>{layerId, selection}</code>, where <code>selection</code> holds indices into the original collection. The cell highlights the picked features and lists their names; use the buttons to hide or restore the picked ones. The same selection arrays are what <code>autk-plot</code> emits and consumes, which is how maps and charts are linked.</p>
   <figure class="example" data-title="6.1 · Picking, highlight and skip" data-needs="0.2">
   <script type="text/plain">
     if (!ctx.neighborhoods) throw new Error("Run the data cell first.");
@@ -416,12 +416,12 @@
     const map = new AutkMap(canvas);
     await map.init();
     map.loadCollection("neighborhoods", {collection});
-    map.updateRenderInfo("neighborhoods", {isPick: true});
+    map.updateRenderInfo("neighborhoods", {isClick: true});
 
     let picked = [];
     map.events.on(MapEvent.CLICK, ({layerId, selection}) => {
       picked = selection;
-      map.setHighlightedIds(layerId, selection);
+      map.setSelection(layerId, selection);
       info.textContent = selection.length
         ? "Picked: " + selection.map(i => collection.features[i].properties.ntaname).join(", ")
         : "Nothing picked.";
@@ -429,12 +429,12 @@
     const hidden = new Set();
     hide.onclick = () => {
       for (const id of picked) hidden.add(id);
-      map.setSkippedIds("neighborhoods", [...hidden]);
+      map.setSkipped("neighborhoods", [...hidden]);
     };
     showBtn.onclick = () => {
       hidden.clear();
-      map.clearSkippedIds("neighborhoods");
-      map.clearHighlightedIds("neighborhoods");
+      map.setSkipped("neighborhoods", []);
+      map.setSelection("neighborhoods", []);
     };
     map.draw();
   </script>

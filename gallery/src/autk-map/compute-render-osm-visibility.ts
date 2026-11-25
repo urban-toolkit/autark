@@ -71,7 +71,7 @@ export class ComputeRenderOsmVisibility {
             collection: this.buildingsWithVisibility,
             property: 'properties.compute.visibilityValue',
         });
-        this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isPick: true, opacity: 0.92 });
+        this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isClick: true, opacity: 0.92 });
     }
 
     protected updateMapListeners(): void {
@@ -182,7 +182,7 @@ export class ComputeRenderOsmVisibility {
             collection: this.buildingsWithVisibility,
             property: 'properties.compute.visibilityValue',
         });
-        this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isPick: true });
+        this.map.updateRenderInfo('table_osm_buildings', { isColorMap: true, isClick: true });
     }
 
 }

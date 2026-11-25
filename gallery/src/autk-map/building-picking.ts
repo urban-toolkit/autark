@@ -80,8 +80,8 @@ async function main(): Promise<void> {
     for (const layer of db.getLayersMetadata()) {
         map.loadCollection(layer.name, { collection: layer.name === LAYER ? buildings : await db.getLayer(layer.name), type: layer.type });
     }
-    map.updateRenderInfo(LAYER, { isPick: true });
-    map.setHover(true);
+    map.updateRenderInfo(LAYER, { isClick: true });
+    map.updateRenderInfo(LAYER, { isHover: true });
     map.setTooltip(LAYER, id => {
         const feature = buildings.features[id];
         if (!feature) return null;
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
         if (layerId === LAYER) summarize(buildings, selection);
     });
     document.querySelector('#clear-selection')!.addEventListener('click', () => {
-        map.setHighlightedIds(LAYER, []);
+        map.setSelection(LAYER, []);
         summarize(buildings, []);
     });
 

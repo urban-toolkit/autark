@@ -26,8 +26,8 @@ export class ShadowsMap {
                 loadConfig: layer.type === 'buildings' ? { buildingsZeroHeight: true } : undefined,
             });
         }
-        this.map.updateRenderInfo(BUILDINGS_LAYER, { isPick: true });
-        this.map.updateRenderInfo(ROADS_LAYER, { isPick: true, isColorMap: true });
+        this.map.updateRenderInfo(BUILDINGS_LAYER, { isClick: true });
+        this.map.updateRenderInfo(ROADS_LAYER, { isClick: true, isColorMap: true });
     }
 
     public onBuildingSelection(onSelection: (id: number | null) => void): void {
@@ -44,12 +44,12 @@ export class ShadowsMap {
     }
 
     public highlightRoads(ids: number[]): void {
-        this.map.setHighlightedIds(ROADS_LAYER, ids);
+        this.map.setSelection(ROADS_LAYER, ids);
         this.map.draw();
     }
 
     public highlightBuilding(id: number | null): void {
-        this.map.setHighlightedIds(BUILDINGS_LAYER, id === null ? [] : [id]);
+        this.map.setSelection(BUILDINGS_LAYER, id === null ? [] : [id]);
         this.map.draw();
     }
 }

@@ -188,10 +188,14 @@ export class PipelineTriangleBorder extends Pipeline {
     updateVertexBuffers(borders: Triangles2DLayer): void {
         this._positionData = this._syncFloatData(this._positionData, borders.borderPosition);
         this._indicesData = this._syncUintData(this._indicesData, borders.borderIndices);
-        this._skippedData = this._syncFloatData(this._skippedData, borders.borderSkippedVertices);
-
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
         this._renderer.device.queue.writeBuffer(this._borderIndicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(borders);
+    }
+
+    /** Hides borders without reuploading their geometry. */
+    updateFeatureState(borders: Triangles2DLayer): void {
+        this._skippedData = this._syncFloatData(this._skippedData, borders.borderSkippedVertices);
         this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
     }
 

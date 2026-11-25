@@ -230,7 +230,7 @@ export class MouseEvents {
                         this.lastHoverAt = performance.now();
                         this._map.queueHover(...this.hoverPoint);
                     };
-                    const wait = this.lastHoverAt + 100 - performance.now();
+                    const wait = this.lastHoverAt + this._map.hoverSampleInterval - performance.now();
                     if (wait <= 0) read();
                     else this.hoverTimer = setTimeout(read, wait);
                 }
@@ -341,10 +341,10 @@ export class MouseEvents {
 
         const [mouseX, mouseY] = this._getPoint(event);
 
-        const activePickingLayer = this._map.activePickingLayer;
-        if (activePickingLayer?.layerRenderInfo.isPick) {
-            activePickingLayer.layerRenderInfo.pickedComps = [mouseX, mouseY];
-            this._map.requestRender();
+        const activeClickLayer = this._map.activeClickLayer;
+        if (activeClickLayer?.layerRenderInfo.isClick) {
+            activeClickLayer.layerRenderInfo.pickedComps = [mouseX, mouseY];
+            this._map.requestPickingFrame();
         }
     }
 
@@ -423,7 +423,7 @@ export class MouseEvents {
     private endHover(): void {
         if (this.hoverTimer !== null) clearTimeout(this.hoverTimer);
         this.hoverTimer = null;
-        if (this.hoverPoint) this._map.clearHover();
+        if (this.hoverPoint) this._map.resetHover();
         this.hoverPoint = null;
         this.lastHoverAt = -Infinity;
     }

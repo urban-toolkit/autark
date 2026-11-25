@@ -46,7 +46,7 @@ map.loadCollection('buildings', {
 });
 
 map.updateRenderInfo('buildings', {
-  renderInfo: { isColorMap: true, isPick: true },
+  renderInfo: { isColorMap: true, isClick: true },
 });
 
 map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
@@ -57,15 +57,18 @@ map.draw();
 ```
 
 `MapEvent.CLICK` replaces the former selection event without changing the double-click
-gesture. `MapEvent.HOVER` uses the same `{ layerId, selection }` payload: one feature
-index on a hit or `[]` on clear. Hover leaves the click selection intact. Configure
-its target with `map.setHover(true, layerId)` (omit the layer ID to follow the click
-layer). Optional `map.setTooltip(layerId, id => 'Feature ' + id)` tooltips appear
+gesture. `MapEvent.HOVER` uses the same `{ layerId, selection, source }` payload: one feature
+index on a hit or `[]` on clear. `source` is `pointer` for pointer movement and `api` for
+`setHover`; listeners that mirror pointer hover should ignore `api` echoes. Hover leaves the click selection intact. Configure
+its target with `map.updateRenderInfo(layerId, { isHover: true })`. Click and hover can
+be different layers, each exclusive. Set `isHover: false` to stop tracking pointer hover. Optional `map.setTooltip(layerId, id => 'Feature ' + id)` tooltips appear
 only when that layer is hovered. Pass `null` to remove the tooltip without
 turning off hover. Strings display as text.
 Use `map.style.setHighlightColor()` and `map.style.setHoverColor()` to configure the
 selection and hover colors. Hover temporarily takes precedence on the hovered feature.
-The layer menu cycles through Interaction only, Hover, Picking, and Hover + Picking.
+The layer menu cycles through Interaction only, Hover, Click, and Hover + Click.
+
+Click and hover reuse the same offscreen feature-ID image while targeting the same vector layer and view. Camera, geometry, visible feature, or picking size changes refresh the image. In flat on-demand mode, a pointer-only pick does not redraw the visible scene; a changed highlight still triggers a redraw. Terrain mode reuses the ID image when its elevation, surface, and overlay are unchanged, but still prepares the visible terrain frame.
 
 Pointer interactions work when the canvas or an ancestor is translated or
 uniformly scaled with CSS (positive scale). Rotation, skew, mirroring, and 3D
@@ -238,8 +241,8 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `new AutkMap(canvas)`: Creates a map controller bound to an HTML canvas.
 * `init()`: Initializes WebGPU resources, event handlers, the camera, and UI controls.
 * `camera`, `renderer`, `layerManager`, `canvas`, `ui`: Expose core map subsystems.
-* `events`: Typed event bus for interactions such as picking.
-* `activePickingLayer`: Returns the layer currently configured for picking.
+* `events`: Typed event bus for interactions such as clicking and hovering.
+* `activeClickLayer`: Returns the layer currently configured for clicking.
 * `loadCollection(id, params)`: Loads a GeoJSON or raster-derived collection as a map layer.
 * `loadMesh(id, params)`: Loads prebuilt mesh geometry directly.
 * `loadTiles(id, params)`: Loads a tile basemap from a URL template or a preset (`TILE_SOURCES`).
@@ -247,11 +250,12 @@ The new line path removes CPU polygon buffering/triangulation, but carries addit
 * `updateThematic(id, params)`: Updates layer values from a GeoJSON property path.
 * `updateRaster(id, params)`: Updates raster values and optional opacity transfer functions, or the three bands of an RGB image.
 * `updateColorMap(id, params)`: Patches the layer colormap configuration.
-* `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, picking, and colormap activation.
+* `updateRenderInfo(id, params)`: Updates render state such as point radius, polyline width, visibility, opacity, clicking, hovering, and colormap activation.
 * `removeLayer(id)`: Removes a layer from the map.
-* `setHighlightedIds(id, selection)`, `clearHighlightedIds(id)`: Controls highlighted vector components.
+* `setSelection(id, selection)`: Replaces highlighted vector components; `[]` clears them.
+* `setHover(id, selection)`: Highlights every listed component as hovered and emits `MapEvent.HOVER`, without changing `setSelection`. Pass `[]` to clear.
 * `setLayerOrder(ids)`, `getLayerOrder()`: Set the 2D stacking order and read the visible 2D layer IDs, bottom first.
-* `setSkippedIds(id, selection)`: Replaces the hidden vector components, like `setHighlightedIds` replaces highlights. Pass the full set of IDs to hide, not just the IDs that changed. Pass `[]` or call `clearSkippedIds(id)` to show all components. Unlike earlier versions, repeating a call does not toggle visibility.
+* `setSkipped(id, selection)`: Replaces the hidden components of a vector layer, including point layers. Hidden components cannot be picked. Pass the full set of IDs to hide, not just the IDs that changed. Pass `[]` to show all components. Repeating a call does not toggle visibility.
 * `draw(options?)`: Starts on-demand rendering by default; a numeric FPS or `{ onDemand: false }` starts a continuous loop.
 * `fitBounds(bounds?)`: Moves the camera, looking straight down, so a rectangle (by default the first loaded collection) fits the viewport. A flat map otherwise starts at a fixed height over the middle of the first layer. Opt-in: loading layers does not call it.
 * `requestRender()`: Requests one on-demand frame after an unobserved change; does not mark CPU buffers or cached uniforms dirty.

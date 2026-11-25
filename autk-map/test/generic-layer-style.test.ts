@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ColorMap, TriangulatorPolylines, TriangulatorPolygons } from '@urban-toolkit/autk-core';
 import { AutkMap } from '../src/map';
 import { Triangles2DLayer } from '../src/layer-triangles2D';
-import { VectorLayer } from '../src/layer-vector';
 import { MapStyle } from '../src/map-style';
 import type { LayerData } from '../src/types-layers';
 
@@ -83,18 +82,16 @@ describe('subdued generic layer defaults', () => {
     map._layerManager.searchByLayerId = () => layer;
     const pipeline = { renderPass: vi.fn(), updateVertexBuffers: vi.fn(), updateColorUniforms: vi.fn() };
     (layer as any)._pipelineBorder = pipeline;
-    // Keep CPU lifecycle/render-state real; only the WebGPU fill boundary is stubbed.
-    const fill = vi.spyOn(VectorLayer.prototype, 'renderPass').mockImplementation(function () {
-      (this as any)._dataIsDirty = false;
-      (this as any)._renderInfoIsDirty = false;
-    });
+    const fill = vi.fn();
+    (layer as any)._pipeline = { renderPass: fill, updateVertexBuffers: vi.fn(), updateColorUniforms: vi.fn() };
+    (layer as any)._pipelinePicking = { updateVertexBuffers: vi.fn() };
     layer.renderPass({} as any, {} as any);
     expect(pipeline.renderPass).toHaveBeenCalledOnce(); // Default remains visible.
     map.updateRenderInfo('tag_polygons', { showBorders: false });
     (layer as any)._dataIsDirty = true;
     layer.renderPass({} as any, {} as any);
     expect(pipeline.renderPass).toHaveBeenCalledOnce();
-    expect(pipeline.updateVertexBuffers).toHaveBeenCalledOnce(); // Hidden buffers still synchronize.
+    expect(pipeline.updateVertexBuffers).toHaveBeenCalledOnce(); // Hidden border buffers still synchronize.
     map.updateRenderInfo('tag_polygons', { renderInfo: { showBorders: true } });
     layer.renderPass({} as any, {} as any);
     expect(pipeline.renderPass).toHaveBeenCalledTimes(2);

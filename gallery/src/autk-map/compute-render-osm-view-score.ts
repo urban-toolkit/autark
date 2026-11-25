@@ -53,7 +53,7 @@ export class ComputeRenderOsmViewScore {
         await this.loadLayers();
         this.updateMapListeners();
 
-        this.map.updateRenderInfo('table_osm_buildings', { isPick: true, opacity: 0.94 });
+        this.map.updateRenderInfo('table_osm_buildings', { isClick: true, opacity: 0.94 });
         this.renderSummary();
         this.map.draw();
     }
@@ -70,7 +70,7 @@ export class ComputeRenderOsmViewScore {
 
             const pickedId = selection[selection.length - 1];
             if (selection.length > 1) {
-                this.map.setHighlightedIds('table_osm_buildings', [pickedId]);
+                this.map.setSelection('table_osm_buildings', [pickedId]);
             }
             await this.analyzePickedBuilding(pickedId);
         });
@@ -98,7 +98,7 @@ export class ComputeRenderOsmViewScore {
             return;
         }
 
-        this.map.setSkippedIds('table_osm_buildings', [pickedId]);
+        this.map.setSkipped('table_osm_buildings', [pickedId]);
         this.map.removeLayer(GENERATED_LAYER_ID);
 
         const pickedCollection: FeatureCollection = {
@@ -192,7 +192,7 @@ export class ComputeRenderOsmViewScore {
     }
 
     protected clearSelectionState(): void {
-        this.map.clearSkippedIds('table_osm_buildings');
+        this.map.setSkipped('table_osm_buildings', []);
         this.map.removeLayer(GENERATED_LAYER_ID);
         this.renderSummary();
     }

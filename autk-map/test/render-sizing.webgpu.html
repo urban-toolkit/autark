@@ -57,7 +57,7 @@ window.renderSizingResult = (async () => {
         map.updateRenderInfo('lines', { renderInfo: { polylinesWidth: 20 } });
         const wide = await pixels(layer('lines'));
         assert(hit(thin, 128, 128) && !hit(thin, 128, 138) && hit(wide, 128, 138), 'Dynamic line width/picking mismatch');
-        layer('lines').setSkippedIds([0]);
+        layer('lines').setSkipped([0]);
         assert(!hit(await pixels(layer('lines')), 128, 128), 'Skipped line is still pickable');
         assert(hit(await pixels(layer('roads')), 128, 138), 'OSM default road width missing');
         map.updateRenderInfo('roads', { renderInfo: { polylinesWidth: 3 } });

@@ -62,10 +62,10 @@ export async function runWebGpuCases() {
         assert(isBackground(bare(300, 300)), 'Coastline notch filled with terrain');
         assert(isBackground(bare(-500, 0)), 'Terrain extends beyond the original surface');
         assert(bare(-300, 0)[0] > bare(-300, 0)[2] + 50, 'Surface terrain is missing');
-        map.setSkippedIds('surface', [0]);
+        map.setSkipped('surface', [0]);
         assert(isBackground((await capture())(-300, 0)), 'Skipping a surface feature must invalidate its cached mesh');
         assert(surfaceBuffers === 6, 'A changed skip mask should rebuild the surface exactly once');
-        map.clearSkippedIds('surface');
+        map.setSkipped('surface', []);
         assert((await capture())(-300, 0)[0] > 100, 'Clearing skipped features must restore surface terrain');
         assert(surfaceBuffers === 9, 'Restoring skipped features should rebuild the surface exactly once');
         await capture();

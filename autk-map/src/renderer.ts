@@ -49,6 +49,8 @@ export class Renderer {
     protected _pickingBuffer!: GPURenderPassColorAttachment;
     /** Offscreen color texture used for picking readback. */
     protected _pickingTexture!: GPUTexture;
+    /** Changes whenever commands write IDs into the shared picking texture. */
+    pickingPassVersion = 0;
     /** Depth attachment used by the picking pass. */
     protected _pickingDepthBuffer!: GPURenderPassDepthStencilAttachment;
     /** Depth texture used by the picking pass. */
@@ -777,6 +779,7 @@ export class Renderer {
             depthStencilAttachment: this._pickingDepthBuffer,
         };
 
+        this.pickingPassVersion++;
         this._beginFrame();
         this._beginEmptyRenderPass(renderPassDesc);
     }
@@ -797,6 +800,8 @@ export class Renderer {
 
         this._pickingBuffer.loadOp = 'clear';
         this._pickingDepthBuffer.depthLoadOp = depthLoadOp;
+        this.pickingPassVersion++;
+        this._beginFrame();
 
         return this.commandEncoder.beginRenderPass({
             colorAttachments: [this._pickingBuffer],
@@ -881,6 +886,7 @@ export class Renderer {
         }
 
         const [px, py] = this.toPixelCoordinates(x, y);
+        this._beginFrame();
 
         this.commandEncoder.copyTextureToBuffer(
             {

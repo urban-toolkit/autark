@@ -233,8 +233,8 @@ function reloadPlots() {
   table = new AutkPlot($("#plotBodyTable"), {type: "table", collection: current(),
     attributes: {axis: [nb ? "ntaname" : "addr:street", ...attrs]}, labels: {axis: ["Id", ...labels], title}, width: 790, events: [PlotEvent.CLICK]});
   // plots → map and the other plot
-  table.events.on(PlotEvent.CLICK, ({selection}) => { map.setHighlightedIds(state.level, selection); parallel.setSelection(selection); onSelect(selection); });
-  parallel.events.on(PlotEvent.BRUSH_Y, ({selection}) => { map.setHighlightedIds(state.level, selection); table.setSelection(selection); onSelect(selection); });
+  table.events.on(PlotEvent.CLICK, ({selection}) => { map.setSelection(state.level, selection); parallel.setSelection(selection); onSelect(selection); });
+  parallel.events.on(PlotEvent.BRUSH_Y, ({selection}) => { map.setSelection(state.level, selection); table.setSelection(selection); onSelect(selection); });
 }
 const onSelect = sel => { if (state.level === "neighborhoods") state.selected = sel; };
 
@@ -267,16 +267,16 @@ async function drillDown() {
 
   map.loadCollection("active_buildings", {collection: activeBuildings, type: "buildings"});
   map.updateRenderInfo("table_osm_buildings", {isSkip: true});
-  map.updateRenderInfo("neighborhoods", {isSkip: true, isPick: false});
-  map.updateRenderInfo("active_buildings", {isSkip: false, isPick: true});
+  map.updateRenderInfo("neighborhoods", {isSkip: true, isClick: false});
+  map.updateRenderInfo("active_buildings", {isSkip: false, isClick: true});
   map.draw(); reloadPlots(); setThematic($("#thematicSelect").value);
 }
 async function drillUp() {
   state.level = "neighborhoods"; state.selected = [];
   await db.removeLayer("active_buildings");
   map.removeLayer("active_buildings");
-  map.updateRenderInfo("table_osm_buildings", {isSkip: false, isPick: false});
-  map.updateRenderInfo("neighborhoods", {isSkip: false, isPick: true});
+  map.updateRenderInfo("table_osm_buildings", {isSkip: false, isClick: false});
+  map.updateRenderInfo("neighborhoods", {isSkip: false, isClick: true});
   map.draw(); reloadPlots(); setThematic($("#thematicSelect").value);
 }
 async function recompute(weights) {
@@ -373,8 +373,8 @@ try {
       if (t.type === "points") continue;
       map.loadCollection(t.name, {collection: t.name === "neighborhoods" ? neighs : await db.getLayer(t.name), type: t.type});
     }
-    map.updateRenderInfo("table_osm_buildings", {isPick: false});
-    map.updateRenderInfo("neighborhoods", {opacity: 0.75, isPick: true, isSkip: true});
+    map.updateRenderInfo("table_osm_buildings", {isClick: false});
+    map.updateRenderInfo("neighborhoods", {opacity: 0.75, isClick: true, isSkip: true});
     // roads colored by their sky exposure
     map.updateColorMap("table_osm_roads", {colorMap: {domainSpec: {type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95]}}});
     map.updateThematic("table_osm_roads", {collection: roadsWithSky, property: `properties.${SKY_ROAD}`});

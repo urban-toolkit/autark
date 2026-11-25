@@ -26,8 +26,8 @@ const CLICK_ICON = '<circle cx="12" cy="12" r="6"/><path d="M12 3v5m0 8v5M3 12h5
 const INTERACTION_MODES = [
     { label: 'Interaction only', icon: '<circle cx="12" cy="12" r="8"/><path d="m6.35 6.35 11.3 11.3"/>' },
     { label: 'Hover', icon: HOVER_ICON },
-    { label: 'Picking', icon: CLICK_ICON },
-    { label: 'Hover + Picking', icon: '<path d="m3 3 4 14 3-6 7-2Z" fill="currentColor"/><circle cx="17" cy="17" r="3"/><path d="M17 12v3m0 4v3m-5-5h3m4 0h3"/>' },
+    { label: 'Click', icon: CLICK_ICON },
+    { label: 'Hover + Click', icon: '<path d="m3 3 4 14 3-6 7-2Z" fill="currentColor"/><circle cx="17" cy="17" r="3"/><path d="M17 12v3m0 4v3m-5-5h3m4 0h3"/>' },
 ] as const;
 
 const DEBUG_FPS = false;
@@ -190,7 +190,7 @@ export class AutkMapUi {
      *
      * The provided layer is first validated against the current layer manager.
      * When a valid layer is found, this method makes picking exclusive by
-     * disabling `isPick` on every other registered layer before enabling it on
+     * disabling `isClick` on every other registered layer before enabling it on
      * the selected one. Unless the user explicitly chose a legend, the legend
      * follows the picking layer.
      *
@@ -205,14 +205,14 @@ export class AutkMapUi {
         if (!layer) return;
         if (!this._legendSelectionExplicit) this._activeLayer = layer;
 
-        // Exclusive isPick: disable on all other vector layers
+        // Exclusive isClick: disable on all other vector layers
         this._map.layerManager.layers.forEach((l: Layer) => {
             if (l.layerInfo.id !== layer.layerInfo.id) {
-                this.map.updateRenderInfo(l.layerInfo.id, { renderInfo: { isPick: false } });
+                this.map.updateRenderInfo(l.layerInfo.id, { renderInfo: { isClick: false } });
             }
         });
 
-        this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isPick: true } });
+        this.map.updateRenderInfo(layer.layerInfo.id, { renderInfo: { isClick: true } });
         this.updateLegendContent();
     }
 
@@ -327,7 +327,7 @@ export class AutkMapUi {
      * Rebuilds the layer list when visible layer state changes.
      *
      * This method is intended to be called after updates to render flags such as
-     * `isSkip`, `isPick`, or `isColorMap`. To avoid unnecessary DOM work, the
+     * `isSkip`, `isClick`, or `isColorMap`. To avoid unnecessary DOM work, the
      * list is repopulated only while the submenu is currently visible.
      *
      * @returns Re-renders the visible layer rows when the submenu is open.
@@ -685,7 +685,7 @@ export class AutkMapUi {
             })();
 
         const hovered = this.map.activeHoverLayer === layer;
-        const picked = Boolean(layer.layerRenderInfo.isPick);
+        const picked = Boolean(layer.layerRenderInfo.isClick);
         const mode = Number(hovered) + 2 * Number(picked);
         const next = (mode + 1) % INTERACTION_MODES.length;
         const { label, icon } = INTERACTION_MODES[mode];
@@ -693,10 +693,9 @@ export class AutkMapUi {
             `<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`, true, () => {
                 const id = layer.layerInfo.id;
                 if (this.map.layerManager.searchByLayerId(id) !== layer) return;
-                if (next & 1) this.map.setHover(true, id);
-                else if (hovered) this.map.setHover(false);
+                this.map.updateRenderInfo(id, { isHover: Boolean(next & 1) });
                 if ((next & 2) && !picked) this.changeActiveLayer(layer);
-                else if (!(next & 2) && picked) this.map.updateRenderInfo(id, { isPick: false });
+                else if (!(next & 2) && picked) this.map.updateRenderInfo(id, { isClick: false });
             });
         if (layer.supportsHighlight) {
             const nextLabel = INTERACTION_MODES[next].label;

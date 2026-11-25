@@ -26,20 +26,20 @@ function layer() {
 describe('the border of a skipped feature', () => {
     it('hides exactly the border vertices of that feature', () => {
         const { layer: l, hiddenBorder } = layer();
-        l.setSkippedIds([1]);
+        l.setSkipped([1]);
         expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8]);
     });
 
     it('covers the first and the last feature', () => {
         const { layer: l, hiddenBorder } = layer();
-        l.setSkippedIds([0, 2]);
+        l.setSkipped([0, 2]);
         expect(hiddenBorder()).toEqual([0, 1, 2, 3, 9, 10, 11]);
     });
 
     it('keeps the same fill and border hidden when IDs are repeated', () => {
         const { layer: l, hiddenBorder } = layer();
-        l.setSkippedIds([1]);
-        l.setSkippedIds([1, 1]);
+        l.setSkipped([1]);
+        l.setSkipped([1, 1]);
         expect(l.skippedIds).toEqual([1]);
         expect([...l.skippedVertices]).toEqual([0, 1, 0]);
         expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8]);
@@ -47,12 +47,12 @@ describe('the border of a skipped feature', () => {
 
     it('replaces the hidden fill and border, and restores all with an empty set', () => {
         const { layer: l, hiddenBorder } = layer();
-        l.setSkippedIds([0, 1]);
-        l.setSkippedIds([1, 2]);
+        l.setSkipped([0, 1]);
+        l.setSkipped([1, 2]);
         expect(l.skippedIds).toEqual([1, 2]);
         expect([...l.skippedVertices]).toEqual([0, 1, 1]);
         expect(hiddenBorder()).toEqual([4, 5, 6, 7, 8, 9, 10, 11]);
-        l.setSkippedIds([]);
+        l.setSkipped([]);
         expect(l.skippedIds).toEqual([]);
         expect([...l.skippedVertices]).toEqual([0, 0, 0]);
         expect(hiddenBorder()).toEqual([]);
@@ -60,13 +60,13 @@ describe('the border of a skipped feature', () => {
 
     it('ignores an id that is not a component', () => {
         const { layer: l, hiddenBorder } = layer();
-        l.setSkippedIds([7, -1]);
+        l.setSkipped([7, -1]);
         expect(hiddenBorder()).toEqual([]);
     });
 
     it('is sized to the border vertices, not to the fill vertices', () => {
         const { layer: l } = layer();
-        l.setSkippedIds([0]);
+        l.setSkipped([0]);
         expect(l.borderSkippedVertices).toHaveLength(12);
         expect(l.skippedVertices).toHaveLength(3);
     });
@@ -115,7 +115,7 @@ describe('a layer built from a real collection', () => {
     it('hides the border vertices of the skipped square only', () => {
         const layer = realLayer();
         const perSquare = layer.borderPosition.length / 2 / 3;
-        layer.setSkippedIds([1]);
+        layer.setSkipped([1]);
         const flags = [...layer.borderSkippedVertices];
         expect(flags.slice(0, perSquare).every((flag) => flag === 0)).toBe(true);
         expect(flags.slice(perSquare, 2 * perSquare).every((flag) => flag === 1)).toBe(true);

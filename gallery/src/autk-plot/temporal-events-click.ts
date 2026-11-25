@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     onExampleDispose(() => map.destroy());
     map.loadCollection(layer, { collection, ...(roads ? { type: 'roads' } : {}) });
     const widths = map.layerManager.searchByLayerId(layer)?.layerRenderInfo.polylinesWidthByComponent;
-    map.updateRenderInfo(layer, { isPick: true, ...(widths ? { polylinesWidthByComponent: widths.map(width => width * 2.5) } : {}) });
+    map.updateRenderInfo(layer, { isClick: true, ...(widths ? { polylinesWidthByComponent: widths.map(width => width * 2.5) } : {}) });
     map.updateThematic(layer, { collection, property: 'properties.sjoin.count.noise' });
     map.setView({ center: { latitude: 40.724, longitude: -73.998 }, zoom: 13.6 });
     map.draw();
@@ -53,10 +53,13 @@ async function main(): Promise<void> {
     });
     onExampleDispose(() => plot.destroy());
 
+    map.updateRenderInfo(layer, { isHover: true });
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
-    plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setHighlightedIds(layer, selection));
-    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
-        map.setHighlightedIds(layer, [...new Set([...plot.selection, ...selection])]));
+    map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+        if (source === 'pointer') plot.setHover(selection);
+    });
+    plot.events.on(PlotEvent.BRUSH_X, ({ selection }) => map.setSelection(layer, selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover(layer, selection));
     document.querySelector('#join-description')!.textContent = roads
         ? 'Reports match every road within 200 m, so one report can count toward several roads.'
         : 'Reports match neighborhood boundaries by location.';

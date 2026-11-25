@@ -26,7 +26,7 @@ export class NiteroiMap {
             const collection = layer.name === ROADS_LAYER ? roads : await getLayer(layer.name);
             this.map.loadCollection(layer.name, { collection, type: layer.type });
         }
-        this.map.updateRenderInfo(ROADS_LAYER, { isPick: true });
+        this.map.updateRenderInfo(ROADS_LAYER, { isClick: true });
         this.map.loadCollection('lst', { collection: raster, type: 'raster', property: yearBand(START_YEAR) });
         this.map.updateRenderInfo('lst', { isSkip: true, opacity: 0.65 });
     }
@@ -54,7 +54,7 @@ export class NiteroiMap {
     }
 
     public highlight(ids: number[]): void {
-        this.map.setHighlightedIds(ROADS_LAYER, ids);
+        this.map.setSelection(ROADS_LAYER, ids);
         this.map.draw();
     }
 }

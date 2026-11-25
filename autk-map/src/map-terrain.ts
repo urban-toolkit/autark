@@ -236,7 +236,15 @@ export class TerrainMapRenderPath {
             );
             buildingCompositePass.end();
         }
-        const pickReadbackSlot = this.renderTerrainPickingPass(pendingPick, activeTerrain, overlayPixelRect);
+        let pickReadbackSlot: number | null = null;
+        if (pendingPick) {
+            const terrainView = [activeTerrain.heightSource.version, activeTerrain.surfaceRevision];
+            if (!(pendingPick.layer instanceof Triangles3DLayer)) terrainView.push(...overlayBounds, ...overlayUvRect);
+            this.picking.renderPickIfNeeded(pendingPick, this.camera, () => {
+                this.renderTerrainPickingPass(pendingPick, activeTerrain, overlayPixelRect);
+            }, activeTerrain, terrainView);
+            pickReadbackSlot = this.picking.enqueuePickingReadback(pendingPick);
+        }
         this.renderer.finish();
         this.picking.resolvePickingReadback(pendingPick, pickReadbackSlot);
         // The overlay of the next frame covers the bounds this readback finds, so new bounds need a frame.
@@ -266,6 +274,7 @@ export class TerrainMapRenderPath {
      */
     updateDebug(options: Partial<TerrainDebugOptions>): void {
         this.terrainDebug = { ...this.terrainDebug, ...options };
+        this.picking.invalidatePickCache();
     }
 
     /**
@@ -412,20 +421,16 @@ export class TerrainMapRenderPath {
      * @param pendingPick Pending pick consumed at the start of the frame.
      * @param activeTerrain Terrain renderer used for terrain depth and picking.
      * @param overlayPixelRect Pixel rectangle occupied by the overlay in its texture.
-     * @returns Picking readback slot, or `null` when no pick is pending.
+     * @returns Nothing. The picking texture is ready for pixel readback.
      * @throws Propagates render-pass creation or layer rendering errors.
      * @example
      * const slot = terrainPath['renderTerrainPickingPass'](pendingPick, terrain, rect);
      */
     private renderTerrainPickingPass(
-        pendingPick: PendingPick | null,
+        pendingPick: PendingPick,
         activeTerrain: TerrainRenderer,
         overlayPixelRect: OverlayPixelRect,
-    ): number | null {
-        if (!pendingPick) {
-            return null;
-        }
-
+    ): void {
         if (pendingPick.layer instanceof Triangles3DLayer) {
             const terrainDepthPass = this.renderer.beginPickingDepthRenderPass();
             activeTerrain.renderDepth(terrainDepthPass);
@@ -435,7 +440,7 @@ export class TerrainMapRenderPath {
             pendingPick.layer.setTerrainHeightSource(activeTerrain.heightSource, activeTerrain.terrainHeightTextureView);
             pendingPick.layer.renderPickingPass(this.camera, buildingPickingPass);
             buildingPickingPass.end();
-            return this.picking.enqueuePickingReadback(pendingPick);
+            return;
         }
 
         const overlayPickingPass = this.renderer.beginOverlayPickingRenderPass();
@@ -447,7 +452,6 @@ export class TerrainMapRenderPath {
         const terrainPickingPass = this.renderer.beginPickingRenderPass();
         activeTerrain.renderPicking(terrainPickingPass);
         terrainPickingPass.end();
-        return this.picking.enqueuePickingReadback(pendingPick);
     }
 
     /**

@@ -11,13 +11,16 @@ export class SpriteLayer extends Layer {
     protected _thematic: Float32Array = new Float32Array(0);
     protected _thematicValidity: Float32Array = new Float32Array(0);
     protected _highlightedVertices: Float32Array = new Float32Array(0);
-    private hoveredId: number | null = null;
+    private hoveredIds: number[] = [];
     private hoverRenderMask: Float32Array | null = null;
     protected _skippedVertices: Float32Array = new Float32Array(0);
     protected _pipeline!: PipelineSprite;
     protected _pipelinePicking!: PipelineSpritePicking;
     protected _highlightedIds: Set<number> = new Set();
     protected _skippedIds: Set<number> = new Set();
+    private _highlightIsDirty = false;
+    private _visibleSkipIsDirty = false;
+    private _pickingSkipIsDirty = false;
 
     constructor(layerInfo: LayerInfo, layerRenderInfo: LayerRenderInfo, layerData: LayerData) {
         super(layerInfo, layerRenderInfo);
@@ -52,21 +55,22 @@ export class SpriteLayer extends Layer {
     }
 
     get highlightedVertices(): Float32Array {
-        const id = this.hoveredId;
-        if (id === null || !this._components[id]) return this._highlightedVertices;
+        const ids = this.hoveredIds.filter(id => this._components[id] !== undefined);
+        if (ids.length === 0) return this._highlightedVertices;
         if (this.hoverRenderMask?.length !== this._highlightedVertices.length) {
             this.hoverRenderMask = new Float32Array(this._highlightedVertices.length);
         }
         this.hoverRenderMask.set(this._highlightedVertices);
-        this.hoverRenderMask.fill(2, id > 0 ? this._components[id - 1].nPoints : 0, this._components[id].nPoints);
+        for (const id of ids) this.hoverRenderMask.fill(2, id > 0 ? this._components[id - 1].nPoints : 0, this._components[id].nPoints);
         return this.hoverRenderMask;
     }
 
     /** Changes the transient render highlight without modifying selected IDs. */
-    setHoveredId(id: number | null): void {
-        if (this.hoveredId === id) return;
-        this.hoveredId = id;
-        this.makeLayerDataDirty();
+    setHoveredIds(ids: number[]): void {
+        if (this.hoveredIds.length === ids.length && this.hoveredIds.every((id, i) => id === ids[i])) return;
+        this.hoveredIds = [...ids];
+        this._highlightIsDirty = true;
+        this.notifyChange();
     }
 
     get skippedVertices(): Float32Array {
@@ -151,19 +155,34 @@ export class SpriteLayer extends Layer {
             this._renderInfoIsDirty = false;
         }
 
-        if (this._dataIsDirty) {
-            this._pipeline.updateVertexBuffers(this);
-            this._pipelinePicking.updateVertexBuffers(this);
-            this._dataIsDirty = false;
+        this.syncGeometry();
+        if (this._highlightIsDirty || this._visibleSkipIsDirty) {
+            this._pipeline.updateFeatureState(this, this._highlightIsDirty, this._visibleSkipIsDirty);
+            this._highlightIsDirty = false;
+            this._visibleSkipIsDirty = false;
         }
-
         this._pipeline.updatePointSize(this.pointSize);
         this._pipeline.renderPass(camera, passEncoder);
     }
 
     override renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
+        this.syncGeometry();
+        if (this._pickingSkipIsDirty) {
+            this._pipelinePicking.updateFeatureState(this);
+            this._pickingSkipIsDirty = false;
+        }
         this._pipelinePicking.updatePointSize(this.pointSize);
         this._pipelinePicking.renderPass(camera, passEncoder);
+    }
+
+    private syncGeometry(): void {
+        if (!this._dataIsDirty) return;
+        this._pipeline.updateVertexBuffers(this);
+        this._pipelinePicking.updateVertexBuffers(this);
+        this._dataIsDirty = false;
+        this._highlightIsDirty = false;
+        this._visibleSkipIsDirty = false;
+        this._pickingSkipIsDirty = false;
     }
 
     toggleHighlightedIds(ids: number[]): void {
@@ -181,19 +200,13 @@ export class SpriteLayer extends Layer {
                 this._highlightedVertices[index] = 1 - this._highlightedVertices[index];
             }
         }
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
+        this._highlightIsDirty = true;
+        this.notifyChange();
     }
 
-    override clearHighlightedIds(): void {
+    override setSelection(ids: number[]): void {
         this._highlightedIds.clear();
         this._highlightedVertices.fill(0);
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
-    }
-
-    override setHighlightedIds(ids: number[]): void {
-        this.clearHighlightedIds();
         for (const id of ids) {
             if (id < 0 || id >= this._components.length) { continue; }
             this._highlightedIds.add(id);
@@ -201,11 +214,13 @@ export class SpriteLayer extends Layer {
             const end = this._components[id].nPoints;
             this._highlightedVertices.fill(1, start, end);
         }
-        this.makeLayerDataDirty();
+        this._highlightIsDirty = true;
+        this.notifyChange();
     }
 
-    override setSkippedIds(ids: number[]): void {
-        this.clearSkippedIds();
+    override setSkipped(ids: number[]): void {
+        this._skippedIds.clear();
+        this._skippedVertices.fill(0);
         for (const id of ids) {
             if (id < 0 || id >= this._components.length) { continue; }
             this._skippedIds.add(id);
@@ -213,13 +228,10 @@ export class SpriteLayer extends Layer {
             const end = this._components[id].nPoints;
             this._skippedVertices.fill(1, start, end);
         }
-        this.makeLayerDataDirty();
-    }
-
-    override clearSkippedIds(): void {
-        this._skippedIds.clear();
-        this._skippedVertices.fill(0);
-        this.makeLayerDataDirty();
+        this._visibleSkipIsDirty = true;
+        this._pickingSkipIsDirty = true;
+        this.invalidatePicking();
+        this.notifyChange();
     }
 
     override destroy(): void {
@@ -228,7 +240,7 @@ export class SpriteLayer extends Layer {
     }
 
     private _resetInteractionState(): void {
-        this.hoveredId = null;
+        this.hoveredIds = [];
         this.hoverRenderMask = null;
         this._highlightedIds = new Set();
         this._skippedIds = new Set();

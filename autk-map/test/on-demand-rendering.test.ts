@@ -253,8 +253,8 @@ const changes: Array<[string, Change]> = [
     ['opacity change', ({ map }) => map.updateRenderInfo('parks', { opacity: 0.4 })],
     ['visibility change', ({ map }) => map.updateRenderInfo('parks', { isSkip: true })],
     ['border toggle', ({ map }) => map.updateRenderInfo('parks', { showBorders: false })],
-    ['highlight set from code', ({ map }) => map.setHighlightedIds('parks', [0])],
-    ['skipped features', ({ map }) => map.setSkippedIds('parks', [0])],
+    ['highlight set from code', ({ map }) => map.setSelection('parks', [0])],
+    ['skipped features', ({ map }) => map.setSkipped('parks', [0])],
     ['style set from code', ({ map }) => map.style.setPredefinedStyle('light')],
     ['highlight color set from code', ({ map }) => map.style.setHighlightColor('#ff0000')],
 ];
@@ -376,7 +376,7 @@ describe('on-demand rendering', () => {
         drag(canvas, false);
         windowTarget.fire('resize');
         map.updateRenderInfo('parks', { opacity: 0.5 });
-        map.setHighlightedIds('parks', [0]);
+        map.setSelection('parks', [0]);
         map.style.setPredefinedStyle('osm');
         map.loadCollection('water', { collection: square, type: 'water' });
         frames.run(3);
@@ -409,7 +409,7 @@ describe('on-demand rendering', () => {
 
     it('renders the picking frame of a double click, then once more for the highlight it changed', async () => {
         const { map, canvas } = await idleOnDemandMap();
-        map.updateRenderInfo('parks', { isPick: true });
+        map.updateRenderInfo('parks', { isClick: true });
         frames.run(3);
         const picked = vi.fn();
         map.events.on(MapEvent.CLICK, picked);
@@ -431,8 +431,8 @@ describe('on-demand rendering', () => {
     it('hovers a different layer without mutating click selection or exposing pointer positions', async () => {
         const { map, canvas } = await idleOnDemandMap();
         map.loadCollection('water', { collection: square, type: 'water' });
-        map.updateRenderInfo('parks', { isPick: true });
-        map.setHighlightedIds('parks', [0]);
+        map.updateRenderInfo('parks', { isClick: true });
+        map.setSelection('parks', [0]);
         const clicked = vi.fn();
         const hovered = vi.fn();
         const tooltip = vi.fn(() => null);
@@ -445,15 +445,15 @@ describe('on-demand rendering', () => {
         expect(tooltip).not.toHaveBeenCalled();
         expect(hovered).not.toHaveBeenCalled();
 
-        map.setHover(true, 'water');
+        map.updateRenderInfo('water', { isHover: true });
         pointer('pointermove', canvas, { clientX: 150, clientY: 120, pointerType: 'mouse' });
         frames.run(3);
         await flushPromises();
-        expect(hovered).toHaveBeenCalledExactlyOnceWith({ layerId: 'water', selection: [0] });
+        expect(hovered).toHaveBeenCalledExactlyOnceWith({ layerId: 'water', selection: [0], source: 'pointer' });
         expect(tooltip).toHaveBeenCalledExactlyOnceWith(0);
         expect(clicked).not.toHaveBeenCalled();
-        expect(map.activePickingLayer?.layerInfo.id).toBe('parks');
-        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
+        expect(map.activeClickLayer?.layerInfo.id).toBe('parks');
+        expect(map.activeClickLayer).toMatchObject({ highlightedIds: [0] });
 
         const press = { buttons: 1, clientX: 150, clientY: 120, pointerType: 'mouse' };
         pointer('pointerdown', canvas, press);
@@ -465,8 +465,8 @@ describe('on-demand rendering', () => {
         map.setTooltip('water', null);
         expect(map.activeHoverLayer?.layerInfo.id).toBe('water');
         canvas.fire('pointerleave');
-        expect(hovered).toHaveBeenLastCalledWith({ layerId: 'water', selection: [] });
-        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
+        expect(hovered).toHaveBeenLastCalledWith({ layerId: 'water', selection: [], source: 'pointer' });
+        expect(map.activeClickLayer).toMatchObject({ highlightedIds: [0] });
 
         // The readback is still in flight when the hovered layer is hidden.
         pointer('pointermove', canvas, { clientX: 150, clientY: 120, pointerType: 'mouse' });
@@ -475,7 +475,7 @@ describe('on-demand rendering', () => {
         map.updateRenderInfo('water', { isSkip: true });
         await flushPromises();
         expect(hovered).not.toHaveBeenCalled();
-        expect(map.activePickingLayer).toMatchObject({ highlightedIds: [0] });
+        expect(map.activeClickLayer).toMatchObject({ highlightedIds: [0] });
     });
 
     it('renders every step of a CameraMotion animation and stops once it settles', async () => {
@@ -535,6 +535,23 @@ describe('on-demand rendering', () => {
 
         expect(renders() - before).toBe(1);
         expect(frames.pending).toBe(0);
+    });
+
+    it('coalesces pick-only frames and keeps a pending visible redraw', async () => {
+        const { map } = await idleOnDemandMap();
+        flatFrames.mockClear();
+        const before = map.renderStats.frameCount;
+        map.requestPickingFrame();
+        map.requestPickingFrame();
+        frames.run();
+        expect(flatFrames.mock.calls).toEqual([[true]]);
+        expect(map.renderStats.frameCount).toBe(before);
+
+        map.requestPickingFrame();
+        map.requestRender();
+        frames.run();
+        expect(flatFrames.mock.calls).toEqual([[true], [false]]);
+        expect(map.renderStats.frameCount).toBe(before + 1);
     });
 
     it('requestRender() schedules one frame however often it is called, and only in on-demand mode', async () => {
@@ -759,7 +776,7 @@ describe('continuous rendering and teardown', () => {
 
     it('ignores a picking result that lands after destroy', async () => {
         const { map, canvas } = await idleOnDemandMap();
-        map.updateRenderInfo('parks', { isPick: true });
+        map.updateRenderInfo('parks', { isClick: true });
         frames.run(3);
         canvas.fire('dblclick', { clientX: 50, clientY: 50 });
         frames.run(1);
@@ -1294,5 +1311,54 @@ describe('tile-only geographic views', () => {
         expect(degrees.camera.getNear()).toBeGreaterThan(0);
         expect(() => degrees.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium })).toThrow(/metre-based/);
         degrees.destroy();
+    });
+});
+
+describe('programmatic hover', () => {
+    it('emits HOVER for a feature without replacing the highlighted selection', async () => {
+        const { map } = await createMap();
+        const events: Array<{ layerId: string; selection: number[] }> = [];
+        map.events.on(MapEvent.HOVER, event => events.push(event as { layerId: string; selection: number[] }));
+        map.setSelection('parks', [0]);
+
+        map.setHover('parks', [0]);
+        expect(events).toEqual([{ layerId: 'parks', selection: [0], source: 'api' }]);
+        map.setHover('parks', [0]);
+        expect(events).toHaveLength(1);
+
+        map.setHover('parks', []);
+        expect(events.at(-1)).toEqual({ layerId: 'parks', selection: [], source: 'api' });
+        map.destroy();
+    });
+
+    it('hovers every feature of an aggregated mark', async () => {
+        const { map } = await createMap();
+        const second = structuredClone(square.features[0]!);
+        second.geometry = { type: 'Polygon', coordinates: [[[200, 0], [300, 0], [300, 100], [200, 100], [200, 0]]] };
+        map.loadCollection('pair', { collection: { ...square, features: [square.features[0]!, second] }, type: 'polygons' });
+        const events: Array<{ layerId: string; selection: number[] }> = [];
+        map.events.on(MapEvent.HOVER, event => events.push(event as { layerId: string; selection: number[] }));
+
+        map.setHover('pair', [0, 1]);
+        expect(events.at(-1)).toEqual({ layerId: 'pair', selection: [0, 1], source: 'api' });
+        map.setHover('pair', []);
+        expect(events.at(-1)).toEqual({ layerId: 'pair', selection: [], source: 'api' });
+        map.destroy();
+    });
+
+    it('keeps one hover layer independently from the click layer', async () => {
+        const { map } = await createMap();
+        map.loadCollection('water', { collection: square, type: 'polygons' });
+        map.updateRenderInfo('parks', { isHover: true });
+        expect(map.activeHoverLayer?.layerInfo.id).toBe('parks');
+        expect(map.layerManager.searchByLayerId('parks')?.layerRenderInfo.isClick).toBeFalsy();
+
+        map.updateRenderInfo('water', { isHover: true });
+        expect(map.activeHoverLayer?.layerInfo.id).toBe('water');
+        expect(map.layerManager.searchByLayerId('parks')?.layerRenderInfo.isHover).toBe(false);
+
+        map.updateRenderInfo('water', { isHover: false });
+        expect(map.activeHoverLayer).toBeNull();
+        map.destroy();
     });
 });

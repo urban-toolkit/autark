@@ -1,6 +1,6 @@
 # Gallery code audit: API in focus and Minimal runnable example
 
-**Baseline:** `183d916f`, after the rewrite of [`gallery/code.ts`](../gallery/code.ts) and [`gallery/source.ts`](../gallery/source.ts). **Scope:** all 34 catalog examples.
+**Baseline:** `183d916f`, after the rewrite of [`gallery/code.ts`](../gallery/code.ts) and [`gallery/source.ts`](../gallery/source.ts). **Scope:** all 36 catalog examples.
 
 ## Rules applied
 
@@ -17,7 +17,7 @@
 | I01–I03 | Strong | Strong | Correct layer id (`table_osm_buildings`), real selection output, and a 25-line camera animation instead of the demo's easing pipeline. |
 | S01, S03, S04 | Strong | Strong | S01 derives the district domain from the data instead of a hidden constant. |
 | B01, B02, T01–T04 | Strong | Strong | `setView()` before tiles or terrain; fixed-raster terrain loads without unrelated vector layers. |
-| P01–P07 | Strong | Strong | Focus is the `AutkPlot` config plus one map-to-plot and one plot-to-map line. Minimal keeps the same calls in a short page program. |
+| P01–P09 | Strong | Strong | Focus is the `AutkPlot` config plus its selection link (click or brush) and hover links. P08 adds a box plot; P09 pairs a click chart with a brush chart, both linked to the map. |
 | A01–A08 | Strong | Strong | A02 shows the chained join and colors its result. A06, A07, and A08 now have distinct programs: `classes`/`sky`, building-window viewpoints, and `objects`. |
 
 ## What changed from the previous audit
@@ -31,8 +31,8 @@
 
 ## Verification
 
-- Every example and selected variants render non-empty, balanced snippets: 48 programs across 34 examples.
-- The 48 generated programs pass `tsc` against the current packages, including gallery path aliases.
+- Every example and selected variants render non-empty, balanced snippets: 50 programs across 36 examples.
+- The 50 generated programs pass `tsc` against the current packages, including gallery path aliases.
 - Gallery type check, ESLint, and `npm run build --workspace ./gallery` pass.
 - Not covered: running every snippet in a browser against its data. The programs type-check and mirror the live examples, but interaction and visual output were not replayed end to end.
 

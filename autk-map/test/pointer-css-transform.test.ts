@@ -7,13 +7,13 @@ function setup(scale: number) {
         focus: vi.fn(),
         getBoundingClientRect: () => ({ left: 110, top: 70, width: 200 * scale, height: 100 * scale }),
     };
-    const layerRenderInfo = { isPick: true, pickedComps: undefined as number[] | undefined };
+    const layerRenderInfo = { isClick: true, pickedComps: undefined as number[] | undefined };
     const map = {
         canvas,
         renderer: { canvas, cssWidth: 200, cssHeight: 100 },
-        activePickingLayer: { layerRenderInfo },
+        activeClickLayer: { layerRenderInfo },
         camera: { zoom: vi.fn(), translate: vi.fn() },
-        requestRender: vi.fn(),
+        requestPickingFrame: vi.fn(),
     };
     const mouse = new MouseEvents(map as never);
     const event = {

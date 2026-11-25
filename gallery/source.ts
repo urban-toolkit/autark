@@ -72,17 +72,6 @@ for (const { name, type } of db.getLayersMetadata()) {
 }
 map.fitBounds();
 map.draw();`;
-        case 'D05': return `${DB_MAP}
-await db.loadOsm({
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [{ name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] }]," : ''}
-  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
-});
-
-for (const { name, type } of db.getLayersMetadata()) {
-  map.loadCollection(name, { collection: await db.getLayer(name), type });
-}
-map.fitBounds();
-map.draw();`;
         case 'D06': return `${DB_MAP}
 await db.loadOsm({
   pbfFileUrl: '/data/monaco.osm.pbf',
@@ -106,7 +95,7 @@ for (const { name, type } of db.getLayersMetadata()) {
   map.loadCollection(name, { collection: name === 'table_osm_buildings'
     ? buildings : await db.getLayer(name), type });
 }
-map.updateRenderInfo('table_osm_buildings', { isPick: true });
+map.updateRenderInfo('table_osm_buildings', { isClick: true });
 map.fitBounds();
 
 map.events.on(MapEvent.CLICK, ({ selection }) => {
@@ -125,15 +114,15 @@ await db.loadOsm({
 for (const { name, type } of db.getLayersMetadata()) {
   map.loadCollection(name, { collection: await db.getLayer(name), type });
 }
-map.updateRenderInfo('table_osm_buildings', { isPick: true });
+map.updateRenderInfo('table_osm_buildings', { isClick: true });
 map.fitBounds();
 
 const hidden = new Set<number>();
 map.events.on(MapEvent.CLICK, ({ selection }) => {
   for (const id of selection) hidden.add(id);
-  map.setSkippedIds('table_osm_buildings', [...hidden]);
+  map.setSkipped('table_osm_buildings', [...hidden]);
 });
-// map.clearSkippedIds('table_osm_buildings') restores every hidden building.
+// map.setSkipped('table_osm_buildings', []) restores every hidden building.
 map.draw();`;
         case 'I03': return `import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap } from '@urban-toolkit/autk-map';
@@ -275,7 +264,7 @@ map.updateColorMap('population', { colorMap: {
 map.updateRenderInfo('population', { isColorMap: true });
 map.fitBounds();
 map.draw();`;
-        case 'T01': return `${DB_TERRAIN}
+        case 'T01': return `${DB_TERRAIN_ONLY}
 await db.loadOsm({
   pbfFileUrl: '/data/niteroi.osm.pbf',
   queryArea: { bbox: [-43.14, -22.97, -43.03, -22.85] },
@@ -326,6 +315,54 @@ map.draw();`;
         case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'BRUSH_Y');
         case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'BRUSH_X',
             "{ preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } }", variant === 'roads' ? 'roads' : 'neighborhoods');
+        case 'P08': return plot('boxplot', "{ axis: ['cdta2020', 'shape_area', '@transform'] }", 'CLICK', "{ preset: 'box-stats' }");
+        case 'P09': return `import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
+import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
+
+const collection = await fetch('/data/mnt_neighs_proj.geojson').then(response => response.json());
+const map = new AutkMap(document.querySelector('canvas')!);
+await map.init();
+map.loadCollection('neighborhoods', { collection });
+map.updateRenderInfo('neighborhoods', { isClick: true, isHover: true });
+map.fitBounds();
+map.draw();
+
+const scatter = new AutkPlot(document.querySelector('#plotScatter')!, {
+  type: 'scatterplot', collection, attributes: { axis: ['shape_area', 'shape_leng'] },
+  events: [PlotEvent.CLICK, PlotEvent.HOVER],
+});
+const histogram = new AutkPlot(document.querySelector('#plotHistogram')!, {
+  type: 'barchart', collection, attributes: { axis: ['shape_area', '@transform'] },
+  transform: { preset: 'binning-1d', options: { bins: 10 } },
+  events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
+});
+
+scatter.events.on(PlotEvent.CLICK, ({ selection }) => {
+  map.setSelection('neighborhoods', selection);
+  histogram.setSelection(selection);
+});
+scatter.events.on(PlotEvent.HOVER, ({ selection }) => {
+  map.setHover('neighborhoods', selection);
+  histogram.setHover(selection);
+});
+histogram.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
+  map.setSelection('neighborhoods', selection);
+  scatter.setSelection(selection);
+});
+histogram.events.on(PlotEvent.HOVER, ({ selection }) => {
+  map.setHover('neighborhoods', selection);
+  scatter.setHover(selection);
+});
+
+map.events.on(MapEvent.CLICK, ({ selection }) => {
+  scatter.setSelection(selection);
+  histogram.setSelection(selection);
+});
+map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+  if (source !== 'pointer') return;
+  scatter.setHover(selection);
+  histogram.setHover(selection);
+});`;
         case 'A01': return `${DB_MAP}
 await db.loadGeojson({ geojsonFileUrl: '/data/mnt_neighs.geojson', outputTableName: 'neighborhoods' });
 await db.loadCsv({ csvFileUrl: '/data/noise.csv', outputTableName: 'noise', geometryColumns: true });
@@ -534,6 +571,16 @@ const map = new AutkMap(document.querySelector('canvas')!);
 await map.init();
 `;
 
+const DB_TERRAIN_ONLY = `import { AutkDb } from '@urban-toolkit/autk-db';
+import { AutkMap, TERRAIN_TILE_SOURCES } from '@urban-toolkit/autk-map';
+
+const db = new AutkDb();
+await db.init();
+
+const map = new AutkMap(document.querySelector('canvas')!);
+await map.init();
+`;
+
 const DB_TERRAIN = `import { AutkDb } from '@urban-toolkit/autk-db';
 import { AutkMap, TILE_SOURCES, TERRAIN_TILE_SOURCES } from '@urban-toolkit/autk-map';
 
@@ -545,6 +592,11 @@ await map.init();
 `;
 
 function plot(type: string, attributes: string, event: string, transform?: string, layer = 'neighborhoods'): string {
+    const brush = event !== 'CLICK';
+    const events = (brush ? [event, 'HOVER'] : ['CLICK', 'HOVER']).map(name => `PlotEvent.${name}`).join(', ');
+    const selectionLink = brush
+        ? `plot.events.on(PlotEvent.${event}, ({ selection }) => map.setSelection('${layer}', selection));`
+        : `plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setSelection('${layer}', selection));`;
     return `import { AutkMap, MapEvent } from '@urban-toolkit/autk-map';
 import { AutkPlot, PlotEvent } from '@urban-toolkit/autk-plot';
 
@@ -553,7 +605,7 @@ const collection = await fetch('/data/mnt_neighs_proj.geojson').then(response =>
 const map = new AutkMap(document.querySelector('canvas')!);
 await map.init();
 map.loadCollection('neighborhoods', { collection });
-map.updateRenderInfo('neighborhoods', { isPick: true });
+map.updateRenderInfo('neighborhoods', { isClick: true });
 map.fitBounds();
 map.draw();
 
@@ -561,8 +613,14 @@ const plot = new AutkPlot(document.querySelector('#plotBody')!, {
   type: '${type}',
   collection,
   attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}
-  events: [PlotEvent.${event}],
+  events: [${events}],
 });
+
+map.updateRenderInfo('neighborhoods', { isHover: true });
 map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
-plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('${layer}', selection));`;
+map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+  if (source === 'pointer') plot.setHover(selection);
+});
+${selectionLink}
+plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover('${layer}', selection));`;
 }

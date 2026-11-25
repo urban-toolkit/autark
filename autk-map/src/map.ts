@@ -149,10 +149,8 @@ export class AutkMap {
     protected _resizeEvents!: ResizeEvents;
     /** Public event bus for map events. */
     protected _mapEvents!: EventEmitter<MapEventRecord>;
-    private hoverEnabled = false;
-    private hoverLayerId?: string;
     private hoverVersion = 0;
-    private hovered: { layer: PickableLayer; id: number } | null = null;
+    private hovered: { layer: PickableLayer; ids: number[] } | null = null;
     private tooltip: { layerId: string; provider: TooltipProvider } | null = null;
     private tooltipElement: HTMLDivElement | null = null;
 
@@ -166,6 +164,7 @@ export class AutkMap {
     protected _animationFrameId: number | null = null;
     /** Whether rendering has started in on-demand mode. */
     protected _onDemand: boolean = false;
+    private _sceneRenderPending = false;
     /** Indicates whether this map instance has been destroyed. */
     protected _isDestroyed: boolean = false;
     /** Set after the first render-loop error to deduplicate repeated frame failures. */
@@ -214,7 +213,7 @@ export class AutkMap {
         this._renderer = new Renderer(canvas, this._style);
 
         this._camera = new MapCamera(() => {
-            this.clearHover();
+            this.resetHover()
             this.requestRender();
         }, () => this._terrainRenderPath?.maxHeight ?? 0);
         this._layerManager = new LayerManager();
@@ -223,7 +222,7 @@ export class AutkMap {
         this._mouseEvents = new MouseEvents(this);
         this._resizeEvents = new ResizeEvents(this);
         this._mapEvents = new EventEmitter<MapEventRecord>();
-        this._picking = new MapPickingController(this._renderer, this._layerManager, this._mapEvents, () => this.requestRender());
+        this._picking = new MapPickingController(this._renderer, this._layerManager, this._mapEvents, () => this.requestPickingFrame());
         this._flatRenderPath = new FlatMapRenderPath(this._renderer, this._camera, this._layerManager, this._picking);
 
         this._ui = new AutkMapUi(this);
@@ -296,8 +295,8 @@ export class AutkMap {
     }
 
     /** Currently active pick-enabled layer, if any. */
-    get activePickingLayer(): Layer | null {
-        return this._layerManager.layers.find((layer) => layer.layerRenderInfo.isPick) ?? null;
+    get activeClickLayer(): Layer | null {
+        return this._layerManager.layers.find((layer) => layer.layerRenderInfo.isClick) ?? null;
     }
 
     /**
@@ -442,7 +441,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
         const layerData: LayerData = {
@@ -483,7 +482,7 @@ export class AutkMap {
             opacity,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 
@@ -943,19 +942,9 @@ export class AutkMap {
         this._ui.refreshLegend(layer);
     }
 
-    /** Enables hover events and a transient highlight, on the pick layer unless a layer is named. */
-    setHover(enabled: boolean, layerId?: string): void {
-        if (this.hoverEnabled === enabled && this.hoverLayerId === layerId) return;
-        this.clearHover();
-        this.hoverEnabled = enabled;
-        this.hoverLayerId = enabled ? layerId : undefined;
-        this._ui.refreshLayerList();
-    }
-
     /** The layer currently targeted for hover highlighting and events. */
     get activeHoverLayer(): Layer | null {
-        if (!this.hoverEnabled) return null;
-        return this.hoverLayerId === undefined ? this.activePickingLayer : this._layerManager.searchByLayerId(this.hoverLayerId);
+        return this._layerManager?.layers?.find(layer => layer.layerRenderInfo.isHover) ?? null;
     }
 
     /** Sets or removes a tooltip for a layer. It only appears while that layer is hovered. */
@@ -971,8 +960,11 @@ export class AutkMap {
         this.tooltipElement = null;
     }
 
+    /** @internal Terrain still prepares its visible scene before picks, so sample it less often. */
+    get hoverSampleInterval(): number { return this._terrainRenderPath ? 100 : 33; }
+
     /** @internal Whether pointer motion is needed for hover. */
-    get tracksHover(): boolean { return this.hoverEnabled; }
+    get tracksHover(): boolean { return this._layerManager?.layers?.some(layer => layer.layerRenderInfo.isHover) ?? false; }
 
     /** @internal Queues a GPU read for the active hover layer. */
     queueHover(x: number, y: number, clientX: number, clientY: number): void {
@@ -985,12 +977,12 @@ export class AutkMap {
             if (version !== this.hoverVersion || this._isDestroyed || this.activeHoverLayer !== layer
                 || layer.layerRenderInfo.isSkip || this._layerManager.searchByLayerId(layerId) !== layer
                 || layer.components !== components) return;
-            if (this.hovered?.layer !== layer || this.hovered?.id !== id) {
-                if (this.hovered && this.hovered.layer !== layer) this.hovered.layer.setHoveredId(null);
-                layer.setHoveredId(id);
+            if (this.hovered?.layer !== layer || this.hovered.ids.length !== 1 || this.hovered.ids[0] !== id) {
+                if (this.hovered && this.hovered.layer !== layer) this.hovered.layer.setHoveredIds([]);
+                layer.setHoveredIds(id === null ? [] : [id]);
                 const hadHover = this.hovered !== null;
-                this.hovered = id === null ? null : { layer, id };
-                if (id !== null || hadHover) this._mapEvents.emit(MapEvent.HOVER, { layerId, selection: id === null ? [] : [id] });
+                this.hovered = id === null ? null : { layer, ids: [id] };
+                if (id !== null || hadHover) this._mapEvents.emit(MapEvent.HOVER, { layerId, selection: id === null ? [] : [id], source: 'pointer' });
             }
             if (version === this.hoverVersion && this.tooltip?.layerId === layerId) {
                 this.showTooltip(this.tooltip.provider, id, clientX, clientY);
@@ -999,7 +991,7 @@ export class AutkMap {
     }
 
     /** @internal Clears transient hover state and invalidates queued and in-flight reads. */
-    clearHover(): void {
+    resetHover(): void {
         if (!this.tracksHover && !this.hovered && !this.tooltipElement) return;
         this.hoverVersion++;
         this._picking?.queueHover(null);
@@ -1008,9 +1000,41 @@ export class AutkMap {
         const hovered = this.hovered;
         this.hovered = null;
         if (hovered) {
-            hovered.layer.setHoveredId(null);
-            this._mapEvents.emit(MapEvent.HOVER, { layerId: hovered.layer.layerInfo.id, selection: [] });
+            hovered.layer.setHoveredIds([]);
+            this._mapEvents.emit(MapEvent.HOVER, { layerId: hovered.layer.layerInfo.id, selection: [], source: 'pointer' });
         }
+    }
+
+    /**
+     * Highlights a feature as hovered, as pointer movement would, and emits `MapEvent.HOVER`.
+     *
+     * The layer's selection is untouched, so a plot can show its hover on the map without
+     * clearing the map's selection. Every id is highlighted; an empty list clears the hover
+     * set through this method.
+     *
+     * @param id Layer identifier.
+     * @param selection Feature ids to hover; `[]` clears.
+     * @returns Nothing. Unsupported, hidden, or unknown layers are ignored.
+     * @throws Never throws.
+     * @example
+     * plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover('neighborhoods', selection));
+     */
+    setHover(id: string, selection: number[]): void {
+        const layer = this._layerManager.searchByLayerId(id);
+        if ((!(layer instanceof VectorLayer) && !(layer instanceof SpriteLayer)) || layer.layerRenderInfo.isSkip) return;
+        const next = [...new Set(selection.filter(value => Number.isInteger(value)))];
+        const hovered = this.hovered;
+        if (next.length === 0) {
+            if (hovered?.layer !== layer) return;
+            layer.setHoveredIds([]);
+            this.hovered = null;
+        } else {
+            if (hovered?.layer === layer && hovered.ids.length === next.length && hovered.ids.every((value, i) => value === next[i])) return;
+            if (hovered && hovered.layer !== layer) hovered.layer.setHoveredIds([]);
+            layer.setHoveredIds(next);
+            this.hovered = { layer, ids: next };
+        }
+        this._mapEvents.emit(MapEvent.HOVER, { layerId: id, selection: next, source: 'api' });
     }
 
     private showTooltip(provider: TooltipProvider, id: number | null, x: number, y: number): void {
@@ -1068,7 +1092,8 @@ export class AutkMap {
         if (layer.layerInfo.typeLayer === 'tiles') {
             // Imagery has no values to color-map and nothing to pick.
             delete nextInfo.isColorMap;
-            delete nextInfo.isPick;
+            delete nextInfo.isClick;
+            delete nextInfo.isHover;
             delete nextInfo.colormap;
         }
 
@@ -1082,16 +1107,25 @@ export class AutkMap {
         if ('isSkip' in info) {
             needsLayerList = true;
         }
-        if ('isPick' in nextInfo) {
-            if (nextInfo.isPick === true) {
-                this.deactivateOtherPickingLayers(id);
-            } else if (nextInfo.isPick === false) {
-                layer.clearHighlightedIds();
+        if ('isClick' in nextInfo) {
+            if (nextInfo.isClick === true) {
+                this.deactivateOtherClickLayers(id);
+            } else if (nextInfo.isClick === false) {
+                layer.setSelection([]);
                 nextInfo.pickedComps = undefined;
             }
             needsLayerList = true;
         }
-        if (this.tracksHover && (nextInfo.isSkip !== undefined || nextInfo.isPick !== undefined)) this.clearHover();
+        if ('isHover' in nextInfo) {
+            if (nextInfo.isHover === true) {
+                this.deactivateOtherHoverLayers(id);
+                if (this.hovered && this.hovered.layer !== layer) this.resetHover();
+            } else if (nextInfo.isHover === false && this.hovered?.layer === layer) {
+                this.resetHover();
+            }
+            needsLayerList = true;
+        }
+        if (this.tracksHover && (nextInfo.isSkip !== undefined || nextInfo.isClick !== undefined)) this.resetHover();
         layer.updateLayerRenderInfo(nextInfo);
 
         if (needsLegend) { this._ui.refreshLegend(layer); }
@@ -1108,10 +1142,10 @@ export class AutkMap {
      */
     removeLayer(id: string): void {
         const removed = this._layerManager.searchByLayerId(id) !== null;
-        if (removed && this.tracksHover) this.clearHover();
-        if (this.hoverLayerId === id) this.setHover(false);
+        if (removed && this.tracksHover) this.resetHover();
         if (this.tooltip?.layerId === id) this.tooltip = null;
         this._layerManager.removeLayerById(id);
+        if (removed) this._picking.invalidatePickCache();
         this._ui.handleLayerRemoved(id);
         this._ui.refreshLayerList();
         this.refreshAttribution();
@@ -1172,33 +1206,17 @@ export class AutkMap {
      * Replaces the highlighted selection of a pickable layer.
      *
      * @param id Layer identifier.
-     * @param selection Component ids to highlight.
+     * @param selection Component ids to highlight; an empty array clears them.
      * @returns Nothing. Unsupported layers are ignored.
      * @throws Never throws.
      */
-    setHighlightedIds(id: string, selection: number[]): void {
+    setSelection(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
         if (!layer || !layer.supportsHighlight) {
             return;
         }
 
-        layer.setHighlightedIds(selection);
-    }
-
-    /**
-     * Clears the highlighted selection of a pickable layer.
-     *
-     * @param id Layer identifier.
-     * @returns Nothing. Unsupported layers are ignored.
-     * @throws Never throws.
-     */
-    clearHighlightedIds(id: string): void {
-        const layer = this._layerManager.searchByLayerId(id);
-        if (!layer || !layer.supportsHighlight) {
-            return;
-        }
-
-        layer.clearHighlightedIds();
+        layer.setSelection(selection);
     }
 
     /**
@@ -1209,31 +1227,14 @@ export class AutkMap {
      * @returns Nothing. Non-vector layers are ignored.
      * @throws Never throws.
      */
-    setSkippedIds(id: string, selection: number[]): void {
+    setSkipped(id: string, selection: number[]): void {
         const layer = this._layerManager.searchByLayerId(id);
-        if (!(layer instanceof VectorLayer)) {
+        if (!(layer instanceof VectorLayer) && !(layer instanceof SpriteLayer)) {
             return;
         }
 
-        if (this.tracksHover) this.clearHover();
-        layer.setSkippedIds(selection);
-    }
-
-    /**
-     * Clears skipped rendering state for a vector layer.
-     *
-     * @param id Layer identifier.
-     * @returns Nothing. Non-vector layers are ignored.
-     * @throws Never throws.
-     */
-    clearSkippedIds(id: string): void {
-        const layer = this._layerManager.searchByLayerId(id);
-        if (!(layer instanceof VectorLayer)) {
-            return;
-        }
-
-        if (this.tracksHover) this.clearHover();
-        layer.clearSkippedIds();
+        if (this.tracksHover) this.resetHover();
+        layer.setSkipped(selection);
     }
 
     /** Removes elevation while preserving imagery, data layers, origin, and camera. */
@@ -1241,6 +1242,7 @@ export class AutkMap {
         if (!this._terrainRenderPath) return;
         this._terrainRenderPath.destroy();
         this._terrainRenderPath = null;
+        this._picking.invalidatePickCache();
         this.clearTerrainTiles();
         this.requestRender();
     }
@@ -1536,16 +1538,19 @@ export class AutkMap {
      * map.requestRender();
      */
     requestRender(): void {
-        if (this._isDestroyed || !this._onDemand || this._animationFrameId !== null) {
-            return;
-        }
+        if (this._isDestroyed || !this._onDemand) return;
+        this._sceneRenderPending = true;
+        this.requestPickingFrame();
+    }
 
+    /** @internal Schedules input readback; a pending scene redraw always takes priority. */
+    requestPickingFrame(): void {
+        if (this._isDestroyed || !this._onDemand || this._animationFrameId !== null) return;
         this._animationFrameId = requestAnimationFrame(() => {
-            // Changes during rendering may miss this frame and must schedule the next one.
             this._animationFrameId = null;
-            if (!this._isDestroyed) {
-                this.render();
-            }
+            const pickOnly = !this._sceneRenderPending && !this._terrainRenderPath;
+            this._sceneRenderPending = false;
+            if (!this._isDestroyed) this.render(pickOnly);
         });
     }
 
@@ -1569,7 +1574,7 @@ export class AutkMap {
 
         this._keyEvents.destroyEvents();
         this._mouseEvents.destroyEvents();
-        this.clearHover();
+        this.resetHover()
         this._resizeEvents.destroyEvents();
         this._terrainRenderPath?.destroy();
         this._terrainRenderPath = null;
@@ -1644,12 +1649,12 @@ export class AutkMap {
      *
      * @returns Nothing. Rendering commands are recorded and submitted to the GPU.
      */
-    private render() {
+    private render(pickOnly = false) {
         try {
             const start = performance.now();
-            this._renderFrame();
+            this._renderFrame(pickOnly);
             const end = performance.now();
-            this._frameStats.record(end - start, end);
+            if (!pickOnly) this._frameStats.record(end - start, end);
         } catch (error) {
             if (!this._renderErrorLogged) {
                 console.warn('AutkMap render skipped:', error);
@@ -1663,14 +1668,14 @@ export class AutkMap {
      * 
      * @returns Nothing. Rendering commands are recorded and submitted to the GPU.
      */
-    private _renderFrame() {
+    private _renderFrame(pickOnly: boolean) {
         this._camera.update();
         if (this._terrainRenderPath) {
             this._terrainRenderPath.renderFrame();
             return;
         }
 
-        this._flatRenderPath.renderFrame();
+        this._flatRenderPath.renderFrame(pickOnly);
     }
 
     /**
@@ -1679,14 +1684,23 @@ export class AutkMap {
      * @param activeLayerId Identifier of the layer that should remain pick-enabled.
      * @returns Nothing. Other pick-enabled layers are deactivated.
      */
-    private deactivateOtherPickingLayers(activeLayerId: string): void {
+    private deactivateOtherClickLayers(activeLayerId: string): void {
         this._layerManager.layers.forEach((otherLayer) => {
-            if (otherLayer.layerInfo.id === activeLayerId || !otherLayer.layerRenderInfo.isPick) {
+            if (otherLayer.layerInfo.id === activeLayerId || !otherLayer.layerRenderInfo.isClick) {
                 return;
             }
 
-            otherLayer.clearHighlightedIds();
-            otherLayer.updateLayerRenderInfo({ isPick: false, pickedComps: undefined });
+            otherLayer.setSelection([]);
+            otherLayer.updateLayerRenderInfo({ isClick: false, pickedComps: undefined });
+        });
+    }
+
+    /** Keeps one hover layer, mirroring the exclusive click layer. */
+    private deactivateOtherHoverLayers(activeLayerId: string): void {
+        this._layerManager.layers.forEach((otherLayer) => {
+            if (otherLayer.layerInfo.id !== activeLayerId && otherLayer.layerRenderInfo.isHover) {
+                otherLayer.updateLayerRenderInfo({ isHover: false });
+            }
         });
     }
 
@@ -1709,7 +1723,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 
@@ -1773,7 +1787,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 
@@ -1828,7 +1842,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 
@@ -1876,7 +1890,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 
@@ -1928,7 +1942,7 @@ export class AutkMap {
             opacity: 1.0,
             colormap: { config: this.defaultColorMap() },
             isColorMap: false,
-            isPick: false,
+            isClick: false,
             isSkip: false,
         };
 

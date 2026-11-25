@@ -59,7 +59,7 @@ export class ProvenanceMap {
             const map = new AutkMap(canvas);
             await map.init();
             map.loadCollection(MAP_LAYER, { collection });
-            map.updateRenderInfo(MAP_LAYER, { isPick: true });
+            map.updateRenderInfo(MAP_LAYER, { isClick: true });
             fitCamera(map, collection);
             map.draw();
             return new ProvenanceMap(map, collection);
@@ -76,7 +76,7 @@ export class ProvenanceMap {
 
     /** Highlights whole regions. */
     public highlight(selection: number[]): void {
-        this.map.setHighlightedIds(MAP_LAYER, selection);
+        this.map.setSelection(MAP_LAYER, selection);
     }
 
     /** Brings the camera back to the initial view of all regions. */
@@ -87,6 +87,6 @@ export class ProvenanceMap {
 
     /** Removes every highlight. */
     public clear(): void {
-        this.map.clearHighlightedIds(MAP_LAYER);
+        this.map.setSelection(MAP_LAYER, []);
     }
 }

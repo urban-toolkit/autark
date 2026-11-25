@@ -114,9 +114,26 @@ export class FlatMapRenderPath {
      * @example
      * flatPath.renderFrame();
      */
-    renderFrame(): void {
+    renderFrame(pickOnly = false): void {
         const pendingPick = this.picking.consumePendingPick();
+        if (!pickOnly) this.renderScene();
 
+        let pickReadbackSlot: number | null = null;
+        if (pendingPick) {
+            this.picking.renderPickIfNeeded(pendingPick, this.camera, () => {
+                const pass = this.renderer.beginPickingRenderPass();
+                pendingPick.layer.renderPickingPass(this.camera, pass);
+                pass.end();
+            });
+            pickReadbackSlot = this.picking.enqueuePickingReadback(pendingPick);
+        }
+
+        this.renderer.finish();
+        this.picking.resolvePickingReadback(pendingPick, pickReadbackSlot);
+    }
+
+    /** Renders the visible scene, independently of the offscreen picking image. */
+    private renderScene(): void {
         this.renderer.start();
         const visible3DLayers = this.layerManager.layers.filter(
             (layer): layer is Triangles3DLayer => !layer.layerRenderInfo.isSkip && layer instanceof Triangles3DLayer
@@ -143,15 +160,5 @@ export class FlatMapRenderPath {
             PipelineBuildingSSAO.compositeSharedPass(this.renderer, mainPassEncoder);
         }
         mainPassEncoder.end();
-
-        let pickReadbackSlot: number | null = null;
-        if (pendingPick) {
-            this.renderer.startPickingRenderPass();
-            pendingPick.layer.renderPickingPass(this.camera);
-            pickReadbackSlot = this.picking.enqueuePickingReadback(pendingPick);
-        }
-
-        this.renderer.finish();
-        this.picking.resolvePickingReadback(pendingPick, pickReadbackSlot);
     }
 }

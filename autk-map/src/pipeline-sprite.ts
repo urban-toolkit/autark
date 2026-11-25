@@ -107,18 +107,28 @@ export class PipelineSprite extends Pipeline {
         this._quadData = this._syncFloatData(this._quadData, [-1, -1, 1, -1, 1, 1, -1, 1]);
         this._instanceData = this._syncFloatData(this._instanceData, layer.pointInstances);
         this._thematicData = this._syncFloatData(this._thematicData, layer.thematic);
-        this._highlightedData = this._syncFloatData(this._highlightedData, layer.highlightedVertices);
         this._thematicValidityData = this._syncFloatData(this._thematicValidityData, layer.thematicValidity);
-        this._skippedData = this._syncFloatData(this._skippedData, layer.skippedVertices);
         this._indicesData = this._syncUintData(this._indicesData, [0, 1, 2, 0, 2, 3]);
 
         this._renderer.device.queue.writeBuffer(this._quadBuffer, 0, this._quadData);
         this._renderer.device.queue.writeBuffer(this._instanceBuffer, 0, this._instanceData);
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
         this._renderer.device.queue.writeBuffer(this._thematicValidityBuffer, 0, this._thematicValidityData);
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(layer, true, true);
+    }
+
+    /** Refreshes only the interaction masks that changed. */
+    updateFeatureState(layer: SpriteLayer, highlight: boolean, skip: boolean): void {
+        const queue = this._renderer.device.queue;
+        if (highlight) {
+            this._highlightedData = this._syncFloatData(this._highlightedData, layer.highlightedVertices);
+            queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
+        }
+        if (skip) {
+            this._skippedData = this._syncFloatData(this._skippedData, layer.skippedVertices);
+            queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+        }
     }
 
     createPointUniformBindGroup(): void {
@@ -143,7 +153,9 @@ export class PipelineSprite extends Pipeline {
     }
 
     updatePointSize(size: number): void {
-        this._pointSizeData[0] = size;
+        const value = Math.fround(size);
+        if (this._pointSizeData[0] === value) return;
+        this._pointSizeData[0] = value;
         this._renderer.device.queue.writeBuffer(this._pointSizeBuffer, 0, this._pointSizeData);
     }
 

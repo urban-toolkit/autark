@@ -135,6 +135,11 @@ export class Triangles3DLayer extends VectorLayer {
         super.renderPass(camera, passEncoder);
     }
 
+    protected override syncGeometry(): void {
+        if (this._dataIsDirty && this._normalsAreDirty) this.computeNormals();
+        super.syncGeometry();
+    }
+
     /**
      * Prepares derived geometry state required for rendering.
      *
@@ -158,9 +163,8 @@ export class Triangles3DLayer extends VectorLayer {
      * vertex-buffer updates to the active pipelines, then delegates the draw
      * call to the SSAO geometry pass implementation at the geometry's elevation.
      *
-     * Render-info updates are applied only when flagged dirty. Vertex-buffer
-     * uploads are applied to both the main render pipeline and the picking
-     * pipeline when layer data changed.
+     * Geometry changes synchronize both pipelines. Interaction changes refresh
+     * only the affected state, with picking visibility synchronized before a pick.
      *
      * @param {Camera} camera Active camera for view and projection uniforms.
      * @param {GPURenderPassEncoder} passEncoder Render-pass encoder for the scene geometry pass.
@@ -176,12 +180,7 @@ export class Triangles3DLayer extends VectorLayer {
             this._renderInfoIsDirty = false;
         }
 
-        if (this._dataIsDirty) {
-            this._pipeline.updateVertexBuffers(this);
-            this._pipelinePicking.updateVertexBuffers(this);
-            this._dataIsDirty = false;
-        }
-
+        this.syncVisibleState();
         (this._pipeline as PipelineBuildingSSAO).renderGeometryPass(camera, passEncoder);
     }
 

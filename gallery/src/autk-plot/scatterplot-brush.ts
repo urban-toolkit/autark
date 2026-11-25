@@ -10,7 +10,7 @@ async function main(): Promise<void> {
     const map = new AutkMap(document.querySelector<HTMLCanvasElement>('canvas')!);
     await map.init();
     map.loadCollection('neighborhoods', { collection });
-    map.updateRenderInfo('neighborhoods', { isPick: true });
+    map.updateRenderInfo('neighborhoods', { isClick: true });
     map.fitBounds();
     map.draw();
 
@@ -24,9 +24,12 @@ async function main(): Promise<void> {
         events: [PlotEvent.BRUSH, PlotEvent.HOVER],
     });
 
+    map.updateRenderInfo('neighborhoods', { isHover: true });
     map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
-    plot.events.on(PlotEvent.BRUSH, ({ selection }) => map.setHighlightedIds('neighborhoods', selection));
-    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
-        map.setHighlightedIds('neighborhoods', [...new Set([...plot.selection, ...selection])]));
+    map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+        if (source === 'pointer') plot.setHover(selection);
+    });
+    plot.events.on(PlotEvent.BRUSH, ({ selection }) => map.setSelection('neighborhoods', selection));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover('neighborhoods', selection));
 }
 void runExample(main);

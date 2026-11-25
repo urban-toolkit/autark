@@ -287,7 +287,11 @@ export class PipelineTrianglePicking extends Pipeline {
 
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(layer);
+    }
 
+    /** Refreshes picking IDs after feature visibility changes. */
+    updateFeatureState(layer: VectorLayer): void {
         // Prepare per-vertex object IDs
         const numVertices = layer.position.length / this._dimension;
         this._objectIdsData = this._syncFloatLength(this._objectIdsData, numVertices * 3);

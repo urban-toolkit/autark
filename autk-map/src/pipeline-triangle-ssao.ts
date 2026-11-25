@@ -424,18 +424,28 @@ export class PipelineBuildingSSAO extends Pipeline {
         this._normalData = this._syncFloatData(this._normalData, mesh.normal);
         this._thematicData = this._syncFloatData(this._thematicData, mesh.thematic);
         this._thematicValidityData = this._syncFloatData(this._thematicValidityData, mesh.thematicValidity);
-        this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
-        this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
         this._positionData = this._syncFloatData(this._positionData, mesh.position);
         this._indicesData = this._syncUintData(this._indicesData, mesh.indices);
 
         this._renderer.device.queue.writeBuffer(this._normalBuffer, 0, this._normalData);
         this._renderer.device.queue.writeBuffer(this._thematicBuffer, 0, this._thematicData);
         this._renderer.device.queue.writeBuffer(this._thematicValidityBuffer, 0, this._thematicValidityData);
-        this._renderer.device.queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
-        this._renderer.device.queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
         this._renderer.device.queue.writeBuffer(this._positionBuffer, 0, this._positionData);
         this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(mesh, true, true);
+    }
+
+    /** Refreshes only the interaction masks that changed. */
+    updateFeatureState(mesh: Triangles3DLayer, highlight: boolean, skip: boolean): void {
+        const queue = this._renderer.device.queue;
+        if (highlight) {
+            this._highlightedData = this._syncFloatData(this._highlightedData, mesh.highlightedVertices);
+            queue.writeBuffer(this._highlightedBuffer, 0, this._highlightedData);
+        }
+        if (skip) {
+            this._skippedData = this._syncFloatData(this._skippedData, mesh.skippedVertices);
+            queue.writeBuffer(this._skippedBuffer, 0, this._skippedData);
+        }
     }
 
     /**

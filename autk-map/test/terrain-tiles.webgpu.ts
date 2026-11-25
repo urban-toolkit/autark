@@ -138,9 +138,14 @@ async function runTerrainCases(pixelRatio: number, crs = 'EPSG:3395') {
 
         map.loadMesh('roof', { geometry: [{ position: new Float32Array([-200, -200, 200, 200, -200, 200, 200, 200, 200, -200, 200, 200]), indices: new Uint32Array([0, 1, 2, 0, 2, 3]) }],
             components: [{ nPoints: 4, nTriangles: 2, featureIndex: 0 }], type: 'buildings' });
-        map.updateRenderInfo('roof', { isPick: true, pickedComps: [64, 64] });
-        await wait(() => (map.layerManager.searchByLayerId('roof') as Triangles3DLayer).highlightedIds.length > 0);
-        checks.push('streamed terrain-aware buildings, composition, and real picking readback');
+        map.updateRenderInfo('roof', { isClick: true, pickedComps: [64, 64] });
+        const roof = map.layerManager.searchByLayerId('roof') as Triangles3DLayer;
+        await wait(() => roof.highlightedIds.length > 0);
+        const pickingPass = map.renderer.pickingPassVersion;
+        map.updateRenderInfo('roof', { pickedComps: [64, 64] });
+        await wait(() => roof.highlightedIds.length === 0);
+        assert(map.renderer.pickingPassVersion === pickingPass, 'Stable terrain roof did not reuse its picking image');
+        checks.push('streamed terrain-aware buildings, composition, and cached picking readback');
 
         const previous = path(); const eye = map.camera.getEye();
         const createTexture = device.createTexture;

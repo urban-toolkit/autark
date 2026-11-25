@@ -78,7 +78,7 @@ export class ComputeRenderOsmSkyExposure {
         });
 
         this.map.updateRenderInfo('table_osm_roads', { isColorMap: true });
-        this.map.updateRenderInfo('table_osm_buildings', { opacity: 0.85, isPick: false });
+        this.map.updateRenderInfo('table_osm_buildings', { opacity: 0.85, isClick: false });
 
         this.map.draw();
     }

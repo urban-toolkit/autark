@@ -37,16 +37,12 @@ await db.loadJson({ jsonFileUrl: '/data/london-tube-lines.json',
 await db.loadCsv({ csvFileUrl: '/data/london-tube-entrances.csv',
   outputTableName: 'tube_entrances',
   geometryColumns: { latColumnName: 'lat', longColumnName: 'lon' } });`;
-        case 'D05': return `await db.loadOsm({
-  queryArea: ${variant === 'place' ? "{ geocodeArea: 'Comunidad de Madrid', areas: ['Sol'] }" : '{ bbox: [-3.7089, 40.4135, -3.6992, 40.4204] }'},${variant === 'tags' ? "\n  tagSets: [{ name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] }]," : ''}
-  autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
-});`;
         case 'D06': return `await db.loadOsm({
   pbfFileUrl: '/data/monaco.osm.pbf',
   queryArea: ${variant === 'place' || variant === 'tags' ? "{ geocodeArea: 'Monaco', areas: ['Monaco'] }" : '{ bbox: [7.405, 43.720, 7.445, 43.7525] }'},${variant === 'tags' ? "\n  tagSets: [{ name: 'cafes', type: 'points', tags: [{ key: 'amenity', value: 'cafe' }] }]," : ''}
   autoLoadLayers: { layers: ${variant === 'tags' ? "['surface', 'parks', 'water', 'roads']" : "['surface', 'parks', 'water', 'roads', 'buildings']"} },
 });`;
-        case 'I01': return `map.updateRenderInfo('table_osm_buildings', { isPick: true });
+        case 'I01': return `map.updateRenderInfo('table_osm_buildings', { isClick: true });
 map.events.on(MapEvent.CLICK, ({ selection }) => {
   const picked = selection.map(id => buildings.features[id]);
   console.log(picked.length, 'buildings selected');
@@ -54,9 +50,9 @@ map.events.on(MapEvent.CLICK, ({ selection }) => {
         case 'I02': return `const hidden = new Set<number>();
 map.events.on(MapEvent.CLICK, ({ selection }) => {
   for (const id of selection) hidden.add(id);
-  map.setSkippedIds('table_osm_buildings', [...hidden]);
+  map.setSkipped('table_osm_buildings', [...hidden]);
 });
-map.clearSkippedIds('table_osm_buildings'); // restore all`;
+map.setSkipped('table_osm_buildings', []); // restore all`;
         case 'I03': return `// Reset the camera on every frame; eye and lookAt move along the path.
 const step = () => {
   map.camera.resetCamera([0, 0, 1], lookAt, eye);
@@ -124,6 +120,44 @@ map.loadTerrain({ source: { collection: await db.getRaster('elevation'), propert
         case 'P06': return plot('parallel-coordinates', "{ axis: ['shape_area', 'shape_leng', 'cdta2020'] }", 'BRUSH_Y');
         case 'P07': return plot('linechart', "{ axis: ['sjoin.collect.noise', '@transform'] }", 'BRUSH_X',
             "{ preset: 'binning-events', options: { timestamp: 'date', resolution: 'day', reducer: 'count' } }", variant === 'roads' ? 'roads' : 'neighborhoods');
+        case 'P08': return plot('boxplot', "{ axis: ['cdta2020', 'shape_area', '@transform'] }", 'CLICK', "{ preset: 'box-stats' }");
+        case 'P09': return `const scatter = new AutkPlot(document.querySelector('#plotScatter')!, {
+  type: 'scatterplot', collection, attributes: { axis: ['shape_area', 'shape_leng'] },
+  events: [PlotEvent.CLICK, PlotEvent.HOVER],
+});
+const histogram = new AutkPlot(document.querySelector('#plotHistogram')!, {
+  type: 'barchart', collection, attributes: { axis: ['shape_area', '@transform'] },
+  transform: { preset: 'binning-1d', options: { bins: 10 } },
+  events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
+});
+
+scatter.events.on(PlotEvent.CLICK, ({ selection }) => {
+  map.setSelection('neighborhoods', selection);
+  histogram.setSelection(selection);
+});
+scatter.events.on(PlotEvent.HOVER, ({ selection }) => {
+  map.setHover('neighborhoods', selection);
+  histogram.setHover(selection);
+});
+histogram.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
+  map.setSelection('neighborhoods', selection);
+  scatter.setSelection(selection);
+});
+histogram.events.on(PlotEvent.HOVER, ({ selection }) => {
+  map.setHover('neighborhoods', selection);
+  scatter.setHover(selection);
+});
+
+map.updateRenderInfo('neighborhoods', { isHover: true });
+map.events.on(MapEvent.CLICK, ({ selection }) => {
+  scatter.setSelection(selection);
+  histogram.setSelection(selection);
+});
+map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+  if (source !== 'pointer') return;
+  scatter.setHover(selection);
+  histogram.setHover(selection);
+});`;
         case 'A01': return `await db.spatialQuery({
   tableRootName: 'neighborhoods',
   tableJoinName: 'noise',
@@ -201,13 +235,23 @@ const objects = result.features[0].properties?.compute?.render?.objects ?? {};`;
 }
 
 function plot(type: string, attributes: string, event: string, transform?: string, layer = 'neighborhoods'): string {
+    const brush = event !== 'CLICK';
+    const events = (brush ? [event, 'HOVER'] : ['CLICK', 'HOVER']).map(name => `PlotEvent.${name}`).join(', ');
+    const selectionLink = brush
+        ? `plot.events.on(PlotEvent.${event}, ({ selection }) => map.setSelection('${layer}', selection));`
+        : `plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setSelection('${layer}', selection));`;
     return `const plot = new AutkPlot(document.querySelector('#plotBody')!, {
   type: '${type}',
   collection,
   attributes: ${attributes},${transform ? `\n  transform: ${transform},` : ''}
-  events: [PlotEvent.${event}],
+  events: [${events}],
 });
 
+map.updateRenderInfo('neighborhoods', { isHover: true });
 map.events.on(MapEvent.CLICK, ({ selection }) => plot.setSelection(selection));
-plot.events.on(PlotEvent.${event}, ({ selection }) => map.setHighlightedIds('${layer}', selection));`;
+map.events.on(MapEvent.HOVER, ({ selection, source }) => {
+  if (source === 'pointer') plot.setHover(selection);
+});
+${selectionLink}
+plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover('${layer}', selection));`;
 }

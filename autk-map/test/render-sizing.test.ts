@@ -31,7 +31,7 @@ function lineLayer(typeLayer: 'polylines' | 'roads' = 'polylines') {
     }, { geometry: data.geometry, components: data.components, polylineAttributes: data.attributes, thematic: [{ value: 4, valid: 1 }, { value: 8, valid: 1 }] });
 }
 
-const pipeline = () => ({ updateColorUniforms: vi.fn(), updateVertexBuffers: vi.fn(), updatePointSize: vi.fn(), updateWidth: vi.fn(), renderPass: vi.fn() });
+const pipeline = () => ({ updateColorUniforms: vi.fn(), updateVertexBuffers: vi.fn(), updateFeatureState: vi.fn(), updatePointSize: vi.fn(), updateWidth: vi.fn(), renderPass: vi.fn() });
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -96,11 +96,12 @@ describe('per-layer render sizing', () => {
         const picking = pipeline();
         (layer as any)._pipeline = visible;
         (layer as any)._pipelinePicking = picking;
-        layer.setHighlightedIds([0]);
-        layer.setSkippedIds([1]);
+        layer.setSelection([0]);
+        layer.setSkipped([1]);
         layer.renderPass({} as any, {} as any); // Synchronize interaction data first.
-        visible.updateVertexBuffers.mockClear();
-        picking.updateVertexBuffers.mockClear();
+        layer.renderPickingPass({} as any, {} as any);
+        visible.updateFeatureState.mockClear();
+        picking.updateFeatureState.mockClear();
         const geometry = layer.position;
         const attributes = layer.polylineAttributes;
         const indices = layer.indices;
@@ -115,6 +116,8 @@ describe('per-layer render sizing', () => {
         expect(visible.updateColorUniforms).toHaveBeenCalledWith(layer);
         expect(visible.updateVertexBuffers).not.toHaveBeenCalled();
         expect(picking.updateVertexBuffers).not.toHaveBeenCalled();
+        expect(visible.updateFeatureState).not.toHaveBeenCalled();
+        expect(picking.updateFeatureState).not.toHaveBeenCalled();
         expect(build).not.toHaveBeenCalled();
         expect(layer.position).toBe(geometry);
         expect(layer.polylineAttributes).toBe(attributes);

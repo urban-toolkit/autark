@@ -135,6 +135,54 @@ export async function runWebGpuCases() {
         }
         checks.push('polyline and sprite visible/picking alignment');
 
+        const line = layer('line');
+        map.setSkipped('line', [0]);
+        near(rgba(await pixels([line]), 64, 64), [0, 0, 0, 0], 'Hidden line is not visible');
+        assert((await pixels([], line))[(64 * 128 + 64) * 4] === 0, 'Hidden line is not pickable');
+        map.setSkipped('line', []);
+        assert((await pixels([], line))[(64 * 128 + 64) * 4] === 1, 'Restored line is pickable before the visible pass');
+        near(rgba(await pixels([line]), 64, 64), [0, 255, 0, 255], 'Restored line is visible');
+        checks.push('polyline hiding and restoration sync visible and picking state independently');
+
+        async function stateUploads(draw: () => Promise<Uint8Array>, expected: string[]) {
+            const queue = device.queue;
+            const write = queue.writeBuffer;
+            const uploads: string[] = [];
+            queue.writeBuffer = (buffer, ...args) => {
+                if (!/matrix|point size/i.test(buffer.label)) uploads.push(buffer.label);
+                return write.call(queue, buffer, ...args);
+            };
+            try {
+                const result = await draw();
+                assert(uploads.sort().join(',') === [...expected].sort().join(','),
+                    `Expected only ${expected.join(', ')}; uploaded ${uploads.join(', ')}`);
+                return result;
+            } finally {
+                queue.writeBuffer = write;
+            }
+        }
+        for (const [id, highlight, skip, picking, border] of [
+            ['lower', 'Highlighted data buffer', 'Skipped data buffer', 'Object id buffer', true],
+            ['point', 'Point highlighted buffer', 'Point skipped buffer', 'Point picking ids buffer', false],
+        ] as const) {
+            const target = layer(id);
+            const draw = () => pixels([target], target);
+            const before = await draw();
+            map.setSelection(id, [0]);
+            identical(before, await stateUploads(draw, [highlight]), `${id} selection changed picking IDs`);
+            map.setHover(id, [0]);
+            identical(before, await stateUploads(draw, [highlight]), `${id} hover changed picking IDs`);
+            map.setHover(id, []);
+            await stateUploads(draw, [highlight]);
+            const index = (64 * 128 + 64) * 4;
+            map.setSkipped(id, [0]);
+            assert((await stateUploads(() => pixels([], target), [picking]))[index] === 0, `Hidden ${id} is pickable`);
+            near(rgba(await stateUploads(() => pixels([target]), border ? [skip, skip] : [skip]), 64, 64), [0, 0, 0, 0], `Hidden ${id} is visible`);
+            map.setSkipped(id, []);
+            identical(before, await stateUploads(draw, border ? [skip, skip, picking] : [skip, picking]), `${id} picking did not restore`);
+        }
+        checks.push('polygon and point highlight and hide only upload their interaction buffers');
+
         const raster: FeatureCollection = { type: 'FeatureCollection', bbox: [-5, -5, 5, 5], features: [{
             type: 'Feature', geometry: square(5).features[0].geometry, properties: { rasterResX: 2, rasterResY: 2, band: [3, 3, 3, 3] },
         }] };
@@ -165,17 +213,92 @@ export async function runWebGpuCases() {
         checks.push('physical building depth, picking alignment, and composite precedence');
         map.style.setHighlightColor('#0000ff');
         map.style.setHoverColor('#ff0000');
-        map.updateRenderInfo('buildings', { isPick: true });
-        building.setHighlightedIds([0, 1]);
-        building.setHoveredId(0);
+        map.updateRenderInfo('buildings', { isClick: true });
+        building.setSelection([0, 1]);
+        building.setHoveredIds([0]);
         const hoverColor = rgba(await pixels([], undefined, [building]), 64, 64);
         assert(hoverColor[0] > 80 && hoverColor[2] < 5, `Hover did not override selection color: ${hoverColor}`);
         assert(building.highlightedIds.join(',') === '0,1', 'Hover changed the selection');
-        building.setHoveredId(null);
+        building.setHoveredIds([]);
         const selectionColor = rgba(await pixels([], undefined, [building]), 64, 64);
         assert(selectionColor[2] > 80 && selectionColor[0] < 5, `Clearing hover did not restore selection: ${selectionColor}`);
-        map.updateRenderInfo('buildings', { isPick: false });
+        map.updateRenderInfo('buildings', { isClick: false });
         checks.push('hover color overrides and restores a building selection without mutating IDs');
+        const drawBuilding = () => pixels([], building, [building]);
+        await drawBuilding();
+        building.toggleHighlightedIds([1]);
+        identical(roofs, await stateUploads(drawBuilding, ['Highlighted data buffer']), 'Building click changed picking');
+        map.setSkipped('buildings', [0]);
+        const rear = await stateUploads(drawBuilding, ['Skipped data buffer', 'Object id buffer']);
+        assert(rear[(64 * 128 + 64) * 4] === 2, 'Hidden roof still blocks picking');
+        map.setSkipped('buildings', []);
+        identical(roofs, await stateUploads(drawBuilding, ['Skipped data buffer', 'Object id buffer']), 'Restored roof did not pick');
+        checks.push('building click and hide do not reupload geometry or normals');
+
+        // Run the actual pick coordinator rather than the explicit rendering helper above.
+        map.updateRenderInfo('buildings', { isClick: true, isHover: true });
+        map.setSelection('buildings', [0, 1]);
+        map.camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 13.036753]);
+        map.camera.resize(128, 128);
+        map.camera.update();
+        const flat = (map as unknown as { _flatRenderPath: { renderFrame(pickOnly?: boolean): void } })._flatRenderPath;
+        const beginPick = renderer.beginPickingRenderPass;
+        const beginMain = renderer.beginMainRenderPass;
+        let pickPasses = 0;
+        let mainPasses = 0;
+        renderer.beginPickingRenderPass = (...args) => { pickPasses++; return beginPick.apply(renderer, args); };
+        renderer.beginMainRenderPass = (...args) => { mainPasses++; return beginMain.apply(renderer, args); };
+        try {
+            const rect = map.canvas.getBoundingClientRect();
+            const x = renderer.cssWidth / 2;
+            const y = renderer.cssHeight / 2;
+            map.queueHover(x, y, rect.left + x, rect.top + y);
+            flat.renderFrame(true);
+            await device.queue.onSubmittedWorkDone();
+            const click = (id: string) => new Promise<number[]>(resolve => {
+                const listener = ({ selection }: { selection: number[] }) => {
+                    map.events.off(MapEvent.CLICK, listener);
+                    resolve(selection);
+                };
+                map.events.on(MapEvent.CLICK, listener);
+                layer(id).layerRenderInfo.pickedComps = [x, y];
+                flat.renderFrame(true);
+            });
+            assert(!(await click('buildings')).includes(0), 'Cached click did not toggle the hovered roof');
+            assert(Number(pickPasses) === 1 && Number(mainPasses) === 0, 'Hover and click should share one picking pass and skip the main pass');
+            map.setSkipped('buildings', [0]);
+            assert((await click('buildings')).length === 0, 'The hidden roof should not block the previously selected rear roof from being toggled');
+            assert(Number(pickPasses) === 2, 'Hiding a roof should invalidate the picking cache');
+            map.setSkipped('buildings', []);
+            building.makeLayerDataDirty();
+            assert((await click('buildings')).includes(0), 'Reloaded geometry and restored visibility should pick the front roof');
+            assert(Number(pickPasses) === 3, 'Geometry changes should invalidate the picking cache');
+            for (const id of ['lower', 'line', 'point']) {
+                map.updateRenderInfo(id, { isClick: true });
+                map.setSelection(id, []);
+                const before = pickPasses;
+                assert((await click(id)).includes(0), `${id} cache miss did not pick the active layer`);
+                assert(!(await click(id)).includes(0), `${id} cache hit did not toggle selection`);
+                assert(pickPasses === before + 1, `${id} should reuse the picking target`);
+            }
+            map.updateRenderInfo('point', { pointSize: 2 });
+            await click('point');
+            assert(Number(pickPasses) === 7, 'Point size should invalidate the cache');
+            map.camera.resize(256, 128);
+            await click('point');
+            assert(Number(pickPasses) === 8 && Number(mainPasses) === 0, 'Projection changes should refresh picking without drawing the scene');
+            renderer.resize(256, 128, 1);
+            await click('point');
+            assert(Number(pickPasses) === 9, 'A new picking texture should invalidate the cache');
+            renderer.resize(128, 128, 1);
+            map.camera.resize(128, 128);
+            map.updateRenderInfo('point', { isClick: false, pointSize: 1 });
+        } finally {
+            renderer.beginPickingRenderPass = beginPick;
+            renderer.beginMainRenderPass = beginMain;
+            map.updateRenderInfo('buildings', { isClick: false, isHover: false });
+        }
+        checks.push('flat hover and click share the picking texture without redrawing the map');
 
         const ui = map.ui as unknown as { makeLayerRow(layer: Layer): HTMLDivElement };
         const labels: string[] = [];
@@ -188,18 +311,18 @@ export async function runWebGpuCases() {
             icons.add(icon!.innerHTML);
             button.click();
         }
-        assert(['Interaction only', 'Hover', 'Picking', 'Hover + Picking'].every((label, i) =>
+        assert(['Interaction only', 'Hover', 'Click', 'Hover + Click'].every((label, i) =>
             labels[i].startsWith(`buildings: ${label}.`)), `Wrong interaction mode cycle: ${labels.join('; ')}`);
         assert(icons.size === 4, 'Each interaction mode must have a distinct icon');
-        assert(!map.activeHoverLayer && !map.activePickingLayer, 'Interaction-only mode still picks or hovers');
+        assert(!map.activeHoverLayer && !map.activeClickLayer, 'Interaction-only mode still picks or hovers');
         checks.push('layer interaction button cycles through all four modes');
 
         host.style.transformOrigin = 'top left';
         host.style.transform = 'translate(24px, 16px) scale(0.5)';
         map.camera.resetCamera([0, 1, 0], [0, 0, 0], [0, 0, 13]);
         map.camera.update();
-        map.updateRenderInfo('lower', { isPick: true });
-        map.setHighlightedIds('lower', [0]);
+        map.updateRenderInfo('lower', { isClick: true });
+        map.setSelection('lower', [0]);
         map.setTooltip('buildings', id => `<Building ${id}>`);
         const hovered: number[][] = [];
         map.events.on(MapEvent.HOVER, ({ selection }) => hovered.push(selection));
@@ -212,7 +335,7 @@ export async function runWebGpuCases() {
         flatPath.renderFrame();
         await device.queue.onSubmittedWorkDone();
         assert(!document.querySelector('[role="tooltip"]') && hovered.length === 0, 'A configured tooltip enabled hover');
-        map.setHover(true, 'buildings');
+        map.updateRenderInfo('buildings', { isHover: true });
         move();
         flatPath.renderFrame();
         let tooltip: HTMLElement | null = null;
@@ -234,10 +357,10 @@ export async function runWebGpuCases() {
         assert(!document.querySelector('[role="tooltip"]') && map.activeHoverLayer === building, 'Removing the tooltip disabled hover');
         canvas.dispatchEvent(new PointerEvent('pointerleave'));
         assert(hovered.length === 2 && hovered[1].length === 0, 'Pointer leave did not clear hover');
-        assert(map.activePickingLayer === layer('lower') && (layer('lower') as unknown as { highlightedIds: number[] }).highlightedIds.join() === '0',
+        assert(map.activeClickLayer === layer('lower') && (layer('lower') as unknown as { highlightedIds: number[] }).highlightedIds.join() === '0',
             'Hover or tooltip changed click selection');
-        map.setHover(false);
-        map.updateRenderInfo('lower', { isPick: false });
+        map.updateRenderInfo('buildings', { isHover: false });
+        map.updateRenderInfo('lower', { isClick: false });
         host.style.transform = '';
         checks.push('independent hover and tooltip position on a translated and scaled canvas');
 

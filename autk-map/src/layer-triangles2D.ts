@@ -186,14 +186,8 @@ export class Triangles2DLayer extends VectorLayer {
     }
 
     /** Skips the given components, in the fill and in the border. */
-    override setSkippedIds(ids: number[]): void {
-        super.setSkippedIds(ids);
-        this._syncBorderSkipped();
-    }
-
-    /** Shows every component again, in the fill and in the border. */
-    override clearSkippedIds(): void {
-        super.clearSkippedIds();
+    override setSkipped(ids: number[]): void {
+        super.setSkipped(ids);
         this._syncBorderSkipped();
     }
 
@@ -219,7 +213,7 @@ export class Triangles2DLayer extends VectorLayer {
             const start = id > 0 ? this._borderComponents[id - 1].nPoints : 0;
             this._borderSkippedVertices.fill(1, start, this._borderComponents[id].nPoints);
         }
-        // The callers mark the layer data dirty, and the upload happens at the next render, after this has run.
+        // The skip upload happens at the next render, after this has run.
     }
 
     /**
@@ -242,33 +236,22 @@ export class Triangles2DLayer extends VectorLayer {
         }
     }
 
-    /**
-     * Renders the filled geometry and, when present, the border pass.
-     *
-     * The border pipeline draws after the fill and updates its vertex buffers
-     * whenever the layer data was dirty at the start of the pass.
-     * This preserves synchronization between filled geometry updates and border
-     * rendering.
-     *
-     * @param camera Active view and projection camera.
-     * @param passEncoder Render pass encoder for the current frame.
-     * @returns Nothing. Draw commands are recorded into the provided render
-     * pass.
-     */
-    override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
-        // VectorLayer.renderPass() clears dirty flags after updating the main
-        // fill/picking pipelines, so preserve the data-dirty state needed to
-        // keep the border buffers in sync for skip/geometry changes.
-        const dataDirty = this._dataIsDirty;
-        const renderInfoDirty = this._renderInfoIsDirty;
+    protected override syncGeometry(): void {
+        if (this._dataIsDirty) this._pipelineBorder?.updateVertexBuffers(this);
+        super.syncGeometry();
+    }
 
+    protected override uploadVisibleFeatureState(highlight: boolean, skip: boolean): void {
+        super.uploadVisibleFeatureState(highlight, skip);
+        if (skip) this._pipelineBorder?.updateFeatureState(this);
+    }
+
+    /** Draws the fill followed by the border, when enabled. */
+    override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
+        const renderInfoDirty = this._renderInfoIsDirty;
         super.renderPass(camera, passEncoder);
 
         if (!this._pipelineBorder) { return; }
-
-        if (dataDirty) {
-            this._pipelineBorder.updateVertexBuffers(this);
-        }
 
         if (renderInfoDirty) {
             this._pipelineBorder.updateColorUniforms(this);

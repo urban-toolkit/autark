@@ -29,18 +29,8 @@ export class PolylineLayer extends VectorLayer {
         this._pipelinePicking.build(this);
     }
 
-    override renderPass(camera: Camera, passEncoder: GPURenderPassEncoder): void {
-        // Picking must use the new width even if it executes before the visible pass.
-        this._pipelinePicking.updateWidth(this);
-        super.renderPass(camera, passEncoder);
-    }
-
     override renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
-        if (this._dataIsDirty) {
-            this._pipeline.updateVertexBuffers(this);
-            this._pipelinePicking.updateVertexBuffers(this);
-            this._dataIsDirty = false;
-        }
+        // Picking must use the new width even if it executes before the visible pass.
         this._pipelinePicking.updateWidth(this);
         super.renderPickingPass(camera, passEncoder);
     }

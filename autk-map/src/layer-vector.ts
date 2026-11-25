@@ -58,7 +58,7 @@ export abstract class VectorLayer extends Layer {
 
     /** Per-vertex highlight mask. */
     protected _highlightedVertices!: Float32Array;
-    private hoveredId: number | null = null;
+    private hoveredIds: number[] = [];
     private hoverRenderMask: Float32Array | null = null;
 
     /** Component ids currently marked as skipped. */
@@ -68,10 +68,14 @@ export abstract class VectorLayer extends Layer {
     protected _skippedVertices!: Float32Array;
 
     /** Primary triangle-rendering pipeline. */
-    protected _pipeline!: Pipeline;
+    protected _pipeline!: Pipeline & { updateFeatureState(layer: VectorLayer, highlight: boolean, skip: boolean): void };
 
     /** Off-screen triangle-picking pipeline. */
-    protected _pipelinePicking!: Pipeline;
+    protected _pipelinePicking!: Pipeline & { updateFeatureState(layer: VectorLayer): void };
+
+    private _highlightIsDirty = false;
+    private _visibleSkipIsDirty = false;
+    private _pickingSkipIsDirty = false;
 
     /** Number of vertices in the position buffer. */
     protected get _vertexCount(): number {
@@ -135,20 +139,21 @@ export abstract class VectorLayer extends Layer {
 
     /** Per-vertex highlight mask uploaded to rendering pipelines. */
     get highlightedVertices(): Float32Array {
-        if (this.hoveredId === null) return this._highlightedVertices;
+        if (this.hoveredIds.length === 0) return this._highlightedVertices;
         if (this.hoverRenderMask?.length !== this._highlightedVertices.length) {
             this.hoverRenderMask = new Float32Array(this._highlightedVertices.length);
         }
         this.hoverRenderMask.set(this._highlightedVertices);
-        this._forEachUniqueVertexInComponents([this.hoveredId], index => { this.hoverRenderMask![index] = 2; });
+        this._forEachUniqueVertexInComponents(this.hoveredIds, index => { this.hoverRenderMask![index] = 2; });
         return this.hoverRenderMask;
     }
 
     /** Changes the transient render highlight without modifying selected IDs. */
-    setHoveredId(id: number | null): void {
-        if (this.hoveredId === id) return;
-        this.hoveredId = id;
-        this.makeLayerDataDirty();
+    setHoveredIds(ids: number[]): void {
+        if (this.hoveredIds.length === ids.length && this.hoveredIds.every((id, i) => id === ids[i])) return;
+        this.hoveredIds = [...ids];
+        this._highlightIsDirty = true;
+        this.notifyChange();
     }
 
     /** Skipped component ids as an array snapshot. */
@@ -334,12 +339,7 @@ export abstract class VectorLayer extends Layer {
             this._renderInfoIsDirty = false;
         }
 
-        if (this._dataIsDirty) {
-            this._pipeline.updateVertexBuffers(this);
-            this._pipelinePicking.updateVertexBuffers(this);
-            this._dataIsDirty = false;
-        }
-
+        this.syncVisibleState();
         this._pipeline.renderPass(camera, passEncoder);
     }
 
@@ -353,7 +353,37 @@ export abstract class VectorLayer extends Layer {
      * @returns Issues draw commands for the off-screen picking pass.
      */
     renderPickingPass(camera: Camera, passEncoder?: GPURenderPassEncoder): void {
+        this.syncGeometry();
+        if (this._pickingSkipIsDirty) {
+            this._pipelinePicking.updateFeatureState(this);
+            this._pickingSkipIsDirty = false;
+        }
         this._pipelinePicking.renderPass(camera, passEncoder);
+    }
+
+    /** Synchronizes geometry for both passes, regardless of which pass runs first. */
+    protected syncGeometry(): void {
+        if (!this._dataIsDirty) return;
+        this._pipeline.updateVertexBuffers(this);
+        this._pipelinePicking.updateVertexBuffers(this);
+        this._dataIsDirty = false;
+        this._highlightIsDirty = false;
+        this._visibleSkipIsDirty = false;
+        this._pickingSkipIsDirty = false;
+    }
+
+    /** Updates the interaction buffers consumed by the visible or scene geometry pass. */
+    protected syncVisibleState(): void {
+        this.syncGeometry();
+        if (this._highlightIsDirty || this._visibleSkipIsDirty) {
+            this.uploadVisibleFeatureState(this._highlightIsDirty, this._visibleSkipIsDirty);
+            this._highlightIsDirty = false;
+            this._visibleSkipIsDirty = false;
+        }
+    }
+
+    protected uploadVisibleFeatureState(highlight: boolean, skip: boolean): void {
+        this._pipeline.updateFeatureState(this, highlight, skip);
     }
 
     /**
@@ -380,8 +410,8 @@ export abstract class VectorLayer extends Layer {
             this._highlightedVertices[vertexIndex] = 1 - this._highlightedVertices[vertexIndex];
         });
 
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
+        this._highlightIsDirty = true;
+        this.notifyChange();
     }
 
     /**
@@ -394,18 +424,17 @@ export abstract class VectorLayer extends Layer {
      * @param ids Component ids that should remain highlighted.
      * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    setHighlightedIds(ids: number[]): void {
-        this.clearHighlightedIds();
-        
+    setSelection(ids: number[]): void {
+        this._highlightedVertices.fill(0);
         this._highlightedIds = new Set(ids);
 
         this._forEachUniqueVertexInComponents(ids, (vertexIndex) => {
             this._highlightedVertices[vertexIndex] = 1;
         });
 
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
-    }    
+        this._highlightIsDirty = true;
+        this.notifyChange();
+    }
 
     /**
      * Replaces the skipped components and rebuilds the per-vertex skip mask.
@@ -413,41 +442,17 @@ export abstract class VectorLayer extends Layer {
      * @param ids Component ids that should remain hidden. An empty list shows all components.
      * @returns Marks layer render state and GPU data as dirty for the next frame.
      */
-    setSkippedIds(ids: number[]): void {
+    setSkipped(ids: number[]): void {
         this._skippedIds = new Set(ids);
         this._skippedVertices.fill(0);
         this._forEachUniqueVertexInComponents([...this._skippedIds], (vertexIndex) => {
             this._skippedVertices[vertexIndex] = 1;
         });
 
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
-    }
-
-    /**
-     * Clears all highlighted component ids and vertex flags.
-     *
-     * @returns Marks layer render state and GPU data as dirty for the next frame.
-     */
-    clearHighlightedIds(): void {
-        this._highlightedVertices.fill(0);
-        this._highlightedIds.clear();
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
-    }
-
-    /**
-     * Clears all skipped component ids and vertex flags.
-     *
-     * @returns Marks layer render state and GPU data as dirty for the next frame.
-     */
-    clearSkippedIds(): void {
-        this._skippedVertices.fill(0);
-        this._skippedIds.clear();
-
-        this.makeLayerRenderInfoDirty();
-        this.makeLayerDataDirty();
+        this._visibleSkipIsDirty = true;
+        this._pickingSkipIsDirty = true;
+        this.invalidatePicking();
+        this.notifyChange();
     }
 
     /**
@@ -491,7 +496,7 @@ export abstract class VectorLayer extends Layer {
      * both highlight and skip id sets are cleared.
      */
     private _resetInteractionState(): void {
-        this.hoveredId = null;
+        this.hoveredIds = [];
         this.hoverRenderMask = null;
         this._highlightedVertices = new Float32Array(this._vertexCount).fill(0);
         this._highlightedIds = new Set<number>();

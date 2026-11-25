@@ -81,14 +81,24 @@ export class PipelineSpritePicking extends Pipeline {
         this._quadData = this._syncFloatData(this._quadData, [-1, -1, 1, -1, 1, 1, -1, 1]);
         this._instanceData = this._syncFloatData(this._instanceData, layer.pointInstances);
         this._indicesData = this._syncUintData(this._indicesData, [0, 1, 2, 0, 2, 3]);
+        this._renderer.device.queue.writeBuffer(this._quadBuffer, 0, this._quadData);
+        this._renderer.device.queue.writeBuffer(this._instanceBuffer, 0, this._instanceData);
+        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
+        this.updateFeatureState(layer);
+    }
+
+    /** Refreshes picking IDs after point visibility changes. */
+    updateFeatureState(layer: SpriteLayer): void {
         this._objectIdsData = this._syncFloatLength(this._objectIdsData, layer.instanceCount * 3);
         this._objectIdsData.fill(0);
 
+        const skipped = layer.skippedVertices;
         for (let compId = 0; compId < layer.components.length; compId++) {
             const color = this._encodeIdToRGB(compId);
             const start = compId > 0 ? layer.components[compId - 1].nPoints : 0;
             const end = layer.components[compId].nPoints;
             for (let instanceId = start; instanceId < end; instanceId++) {
+                if (skipped[instanceId] > 0) continue;
                 const base = instanceId * 3;
                 this._objectIdsData[base + 0] = color[0];
                 this._objectIdsData[base + 1] = color[1];
@@ -96,10 +106,7 @@ export class PipelineSpritePicking extends Pipeline {
             }
         }
 
-        this._renderer.device.queue.writeBuffer(this._quadBuffer, 0, this._quadData);
-        this._renderer.device.queue.writeBuffer(this._instanceBuffer, 0, this._instanceData);
         this._renderer.device.queue.writeBuffer(this._objectIdsBuffer, 0, this._objectIdsData);
-        this._renderer.device.queue.writeBuffer(this._indicesBuffer, 0, this._indicesData);
     }
 
     private _encodeIdToRGB(id: number): [number, number, number] {
@@ -127,7 +134,9 @@ export class PipelineSpritePicking extends Pipeline {
     }
 
     updatePointSize(size: number): void {
-        this._pointSizeData[0] = size;
+        const value = Math.fround(size);
+        if (this._pointSizeData[0] === value) return;
+        this._pointSizeData[0] = value;
         this._renderer.device.queue.writeBuffer(this._pointSizeBuffer, 0, this._pointSizeData);
     }
 

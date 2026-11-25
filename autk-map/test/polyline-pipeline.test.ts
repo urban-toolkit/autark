@@ -89,14 +89,91 @@ describe('shader-expanded polyline GPU boundary', () => {
         expect(uploads.at(-1)).toEqual({ label: 'Polyline width override', data: [24] });
     });
 
+    it('reads the hover mask once per visible upload and never for picking', () => {
+        const { layer, renderer, uploads } = fixture();
+        const visible = new PipelinePolyline(renderer);
+        const picking = new PipelinePolyline(renderer, true);
+        visible.build(layer);
+        picking.build(layer);
+        layer.setSelection([0]);
+        layer.setHoveredIds([0, 1]);
+        const indexed = new Set(layer.indices);
+        const mask = vi.spyOn(layer, 'highlightedVertices', 'get');
+
+        visible.updateVertexBuffers(layer);
+        expect(mask).toHaveBeenCalledOnce();
+        expect(uploads.findLast(upload => upload.label === 'Polyline feature state')!.data.filter((_, i) => i % 4 === 1))
+            .toEqual(Array.from({ length: 20 }, (_, i) => indexed.has(i) ? 2 : 0));
+
+        picking.updateVertexBuffers(layer);
+        expect(mask).toHaveBeenCalledOnce();
+
+        layer.setHoveredIds([]);
+        visible.updateVertexBuffers(layer);
+        expect(uploads.findLast(upload => upload.label === 'Polyline feature state')!.data.filter((_, i) => i % 4 === 1))
+            .toEqual(Array.from({ length: 20 }, (_, i) => i < 10 && indexed.has(i) ? 1 : 0));
+    });
+
     it('encodes feature IDs and skip masks for indexed picking vertices', () => {
         const { layer, renderer, uploads } = fixture();
-        layer.setSkippedIds([1]);
+        layer.setSkipped([1]);
         const picking = new PipelinePolyline(renderer, true);
         picking.build(layer);
         const state = uploads.find(upload => upload.label === 'Polyline feature state')!.data;
         expect(state.slice(0, 4)).toEqual([Math.fround(1 / 255), 0, 0, 0]);
         expect(state.slice(48, 52)).toEqual([Math.fround(2 / 255), 0, 0, 1]);
+    });
+
+    it.each([false, true])('uploads only changed feature state across passes (picking first: %s)', pickingFirst => {
+        const { layer, renderer, uploads } = fixture();
+        layer.createPipeline(renderer);
+        const camera = { getModelViewMatrix: () => Array(16).fill(0), getProjectionMatrix: () => Array(16).fill(0) } as any;
+        const pass = { setPipeline: vi.fn(), setVertexBuffer: vi.fn(), setIndexBuffer: vi.fn(), setBindGroup: vi.fn(), drawIndexed: vi.fn() } as any;
+        const visible = () => layer.renderPass(camera, pass);
+        const picking = () => layer.renderPickingPass(camera, pass);
+        const draw = () => {
+            if (pickingFirst) { picking(); visible(); } else { visible(); picking(); }
+        };
+        const state = () => uploads.filter(upload => upload.label === 'Polyline feature state').map(upload => upload.data);
+        const onChange = vi.fn();
+        layer.setChangeListener(onChange);
+        draw(); // Flush initial uniforms.
+
+        uploads.length = 0;
+        layer.toggleHighlightedIds([0]);
+        expect(onChange).toHaveBeenCalled();
+        draw();
+        expect(uploads.filter(upload => !upload.label.includes('matrix')).map(upload => upload.label)).toEqual(['Polyline feature state']);
+        expect(state()[0][9]).toBe(1);
+
+        uploads.length = 0;
+        layer.setSelection([1]);
+        layer.setHoveredIds([0]);
+        draw();
+        expect(state()).toHaveLength(1);
+        expect(state()[0][9]).toBe(2);
+        expect(state()[0][49]).toBe(1);
+
+        for (const skipped of [[1], []]) {
+            uploads.length = 0;
+            layer.setSkipped(skipped);
+            draw();
+            expect(uploads.filter(upload => !upload.label.includes('matrix')).map(upload => upload.label))
+                .toEqual(['Polyline feature state', 'Polyline feature state']);
+            const [a, b] = state();
+            const [colorState, pickingState] = pickingFirst ? [b, a] : [a, b];
+            expect(colorState[51]).toBe(skipped.length);
+            expect(pickingState.slice(48, 52)).toEqual([Math.fround(2 / 255), 0, 0, skipped.length]);
+        }
+
+        uploads.length = 0;
+        draw();
+        expect(state()).toEqual([]);
+
+        layer.makeLayerDataDirty();
+        draw();
+        expect(uploads.filter(upload => upload.label === 'Polyline centers')).toHaveLength(2);
+        expect(state()).toHaveLength(2);
     });
 
     it('draws centerline topology and releases all owned buffers', () => {

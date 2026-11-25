@@ -39,6 +39,11 @@ import type { SelectionData } from '@urban-toolkit/autk-core';
 export interface MapEventData extends SelectionData {
     /** Identifier of the layer that emitted the event. */
     layerId: string;
+    /**
+     * Where a HOVER event came from: pointer movement or `setHover`.
+     * Consumers that mirror pointer hover should ignore `api` echoes.
+     */
+    source?: 'pointer' | 'api';
 }
 
 /**

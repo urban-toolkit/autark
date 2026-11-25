@@ -64,8 +64,10 @@ export interface LayerRenderInfo {
     isColorMap?: boolean;
     /** Skips rendering work for this layer when `true`. */
     isSkip?: boolean;
-    /** Enables picking for this layer when `true`. */
-    isPick?: boolean;
+    /** Enables click and double-click picking for this layer when `true`. Only one layer is the click layer. */
+    isClick?: boolean;
+    /** Enables pointer hover for this layer when `true`. Only one layer is the hover layer. */
+    isHover?: boolean;
     /** Current colormap configuration and derived runtime domain or label state. */
     colormap: LayerColormap;
     /** Pending canvas-relative pick coordinates `[x, y]` in CSS pixels, if any. */

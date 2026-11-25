@@ -22,8 +22,8 @@ export class UrbaneMap {
                 : layer.name === 'table_osm_roads' ? roadsWithSky : await getLayer(layer.name);
             this.map.loadCollection(layer.name, { collection, type: layer.type });
         }
-        this.map.updateRenderInfo('table_osm_buildings', { isPick: false });
-        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75, isPick: true, isSkip: false });
+        this.map.updateRenderInfo('table_osm_buildings', { isClick: false });
+        this.map.updateRenderInfo('neighborhoods', { opacity: 0.75, isClick: true, isSkip: false });
         this.map.updateColorMap('table_osm_roads', { colorMap: {
             domainSpec: { type: ColorMapDomainStrategy.PERCENTILE, params: [5, 95] },
         } });
@@ -52,22 +52,22 @@ export class UrbaneMap {
     }
 
     public highlight(level: UrbaneLevel, ids: number[]): void {
-        this.map.setHighlightedIds(level, ids);
+        this.map.setSelection(level, ids);
         this.map.draw();
     }
 
     public showBuildings(collection: FeatureCollection): void {
         this.map.loadCollection('active_buildings', { collection, type: 'buildings' });
         this.map.updateRenderInfo('table_osm_buildings', { isSkip: true });
-        this.map.updateRenderInfo('neighborhoods', { isSkip: true, isPick: false });
-        this.map.updateRenderInfo('active_buildings', { isSkip: false, isPick: true });
+        this.map.updateRenderInfo('neighborhoods', { isSkip: true, isClick: false });
+        this.map.updateRenderInfo('active_buildings', { isSkip: false, isClick: true });
         this.map.draw();
     }
 
     public showNeighborhoods(): void {
         this.map.removeLayer('active_buildings');
-        this.map.updateRenderInfo('table_osm_buildings', { isSkip: false, isPick: false });
-        this.map.updateRenderInfo('neighborhoods', { isSkip: false, isPick: true });
+        this.map.updateRenderInfo('table_osm_buildings', { isSkip: false, isClick: false });
+        this.map.updateRenderInfo('neighborhoods', { isSkip: false, isClick: true });
         this.highlight('neighborhoods', []);
     }
 }

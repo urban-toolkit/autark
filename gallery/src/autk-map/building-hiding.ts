@@ -23,7 +23,7 @@ async function main(): Promise<void> {
     for (const layer of db.getLayersMetadata()) {
         map.loadCollection(layer.name, { collection: await db.getLayer(layer.name), type: layer.type });
     }
-    map.updateRenderInfo(LAYER, { isPick: true });
+    map.updateRenderInfo(LAYER, { isClick: true });
     map.fitBounds();
 
     const hideButton = document.querySelector<HTMLButtonElement>('#hide-selected')!;
@@ -41,23 +41,23 @@ async function main(): Promise<void> {
     map.events.on(MapEvent.CLICK, ({ selection, layerId }) => {
         if (layerId !== LAYER) return;
         selected = selection.length === 0 ? null : selection[selection.length - 1]!;
-        map.setHighlightedIds(LAYER, selected === null ? [] : [selected]);
+        map.setSelection(LAYER, selected === null ? [] : [selected]);
         refresh();
     });
 
     hideButton.addEventListener('click', () => {
         if (selected === null || hidden.has(selected)) return;
         hidden.add(selected);
-        map.setSkippedIds(LAYER, [...hidden]);
+        map.setSkipped(LAYER, [...hidden]);
         selected = null;
-        map.setHighlightedIds(LAYER, []);
+        map.setSelection(LAYER, []);
         refresh();
     });
     restoreButton.addEventListener('click', () => {
-        map.clearSkippedIds(LAYER);
+        map.setSkipped(LAYER, []);
         hidden.clear();
         selected = null;
-        map.setHighlightedIds(LAYER, []);
+        map.setSelection(LAYER, []);
         refresh();
     });
 
