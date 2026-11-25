@@ -857,7 +857,7 @@ export function drawAutoPart(
                 const dot = mark.ownerDocument.createElementNS(SVG, 'circle') as SVGCircleElement;
                 const across = middle + memberOffset(feature, band);
                 const along = a + k * value;
-                dot.setAttribute('class', 'autkPartial');
+                dot.setAttribute('class', context.className ?? 'autkPartial');
                 dot.setAttribute('data-autk-provenance', part.mark);
                 dot.setAttribute('data-autk-feature', String(feature));
                 dot.setAttribute('data-autk-value', String(value));

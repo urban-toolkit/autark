@@ -32,7 +32,6 @@ async function main(): Promise<void> {
         if (source === 'pointer') plot.setHover(selection);
     });
     plot.events.on(PlotEvent.CLICK, ({ selection }) => map.setSelection('neighborhoods', selection));
-    plot.events.on(PlotEvent.HOVER, ({ selection }) =>
-        map.setSelection('neighborhoods', [...new Set([...plot.selection, ...selection])]));
+    plot.events.on(PlotEvent.HOVER, ({ selection }) => map.setHover('neighborhoods', selection));
 }
 void runExample(main);
