@@ -29,6 +29,8 @@ export interface BuildHeatmapParams {
     outputTableName: string;
     /** Columns to aggregate into separate bands. Omit or pass an empty list to count nearby rows. */
     groupBy?: HeatmapGroupBy[];
+    /** Gaussian standard deviation in grid cells (0–32). Applied to each band after aggregation and normalization. Defaults to 0 (no smoothing). */
+    smoothingSigma?: number;
     /** Grid dimensions for the heatmap overlay. */
     grid: {
         /** Number of rows in the output grid. */

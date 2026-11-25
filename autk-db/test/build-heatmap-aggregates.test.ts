@@ -91,6 +91,36 @@ describe('heatmap cells hold the aggregate of the rows near their center', () =>
     expect(bandsOf('counted')).toEqual({ count_readings: [1, 2, 0, 3, 1, 2] });
   });
 
+  it('exports Gaussian-smoothed bands without changing the raw heatmap', async () => {
+    await loadReadings([point(0, 0, {}), point(3, 3, {}), point(1.5, 1.5, { value: 8 })]);
+    const options = {
+      tableJoinName: 'readings', near: { distance: 0.3 }, grid: { rows: 3, columns: 3 },
+      groupBy: [{ column: '*', aggregateFn: 'count' }, { column: 'value', aggregateFn: 'sum' }],
+    } satisfies Omit<BuildHeatmapParams, 'outputTableName'>;
+    await db.buildHeatmap({ ...options, outputTableName: 'raw' });
+    await db.buildHeatmap({ ...options, outputTableName: 'smooth', smoothingSigma: 0.5 });
+
+    const raw = (await db.getRaster('raw')).features[0].properties!;
+    const smooth = (await db.getRaster('smooth')).features[0].properties!;
+    expectCells(raw.band_1, [0, 0, 0, 0, 1, 0, 0, 0, 0]);
+    expect(smooth.rasterResX).toBe(3);
+    expect(smooth.rasterResY).toBe(3);
+    const adjacent = Math.exp(-2);
+    const center = 1 / (1 + 2 * adjacent + 2 * Math.exp(-8));
+    const axis = [center * adjacent, center, center * adjacent];
+    const expected = axis.flatMap(y => axis.map(x => x * y));
+    expectCells(smooth.band_1, expected);
+    expectCells(smooth.band_2, expected.map(value => 8 * value));
+  });
+
+  it.each([-1, Infinity, NaN, 33])('rejects an invalid smoothing sigma of %s', async (smoothingSigma) => {
+    await loadReadings(readings);
+    await expect(db.buildHeatmap({
+      tableJoinName: 'readings', outputTableName: 'invalid_smoothing', near: { distance: 0.6 },
+      grid: { rows: 2, columns: 3 }, smoothingSigma,
+    })).rejects.toThrow(/smoothingSigma/);
+  });
+
   it('counts each requested column separately, including nulls, zero values, and row counts', async () => {
     await loadReadings(readings.map((feature, index) => ({
       ...feature, properties: { ...feature.properties, ...(index === 5 ? { humidity: 0 } : index === 6 ? { humidity: null } : {}) },

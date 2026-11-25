@@ -205,7 +205,7 @@ console.log(parcels.type); // 'polygons'
 * `updateTable(params)`: Updates a table using the supported update strategies.
 * `spatialQuery(params)`: Runs spatial joins and aggregations from a vector root against vector features or compact raster cell centers.
 * `rawQuery(params)`: Executes custom SQL against the current workspace.
-* `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs.
+* `buildHeatmap(params)`: Creates a grid internally and builds aggregated heatmap outputs. Set `smoothingSigma` to apply a Gaussian blur to each output band. Sigma is expressed in grid cells (0–32, default 0), and the blur runs after aggregation and optional normalization. Smoothed values may be fractional, including counts. Use a higher sigma on a finer grid to retain the same smoothing distance.
 * `removeLayer(tableName)`: Drops a table from the current workspace.
 
 Omit `groupBy` or pass `[]` to get one band counting nearby rows. Each explicit `groupBy` entry must include `aggregateFn`, such as `groupBy: [{ column: 'temperature', aggregateFn: 'avg' }]`.

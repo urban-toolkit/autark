@@ -42,6 +42,11 @@ export class BuildHeatmapUseCase {
             throw new Error('Bounding box is required to build a heatmap.');
         }
 
+        const sigma = params.smoothingSigma === undefined ? 0 : params.smoothingSigma;
+        if (!Number.isFinite(sigma) || sigma < 0 || sigma > 32) {
+            throw new Error('Heatmap smoothingSigma must be a finite number between 0 and 32 grid cells.');
+        }
+
         const sourceTable = tables.find((t) => t.name === params.tableJoinName);
         if (!sourceTable) {
             throw new Error(`Table ${params.tableJoinName} not found.`);
@@ -91,6 +96,7 @@ export class BuildHeatmapUseCase {
             params.grid.columns,
             workspace,
             workspaceCrs,
+            sigma,
         );
 
         const describeTableResponse = await this.conn.query(`DESCRIBE ${workspace}.${gridTableName}`);
@@ -202,6 +208,7 @@ ${bandAssignments}
         columns: number,
         workspace: string,
         workspaceCrs: string,
+        sigma: number,
     ): Promise<void> {
         const qualifiedTableName = `${workspace}.${tableName}`;
         const bandSelect = bands.map((band) => `properties.${band.id} AS ${band.id}`).join(',\n          ');
@@ -230,6 +237,8 @@ ${bandAssignments}
                 values[band.id][flatIndex] = Number.isFinite(numeric) ? numeric : 0;
             }
         }
+
+        if (sigma > 0) this.smoothBands(values, rows, columns, sigma);
 
         const { minLon, minLat, maxLon, maxLat } = boundingBox;
         const resX = (maxLon - minLon) / columns;
@@ -274,6 +283,34 @@ ${bandAssignments}
             '${workspaceCrs}'::VARCHAR AS source_crs,
             '${workspaceCrs}'::VARCHAR AS target_crs;
         `);
+    }
+
+    /** Applies a separable Gaussian to each band, extending the edge cells at the raster boundary. */
+    private smoothBands(values: Record<string, Float32Array>, rows: number, columns: number, sigma: number): void {
+        const radius = Math.ceil(3 * sigma);
+        const weights = Array.from({ length: 2 * radius + 1 }, (_, i) => Math.exp(-0.5 * ((i - radius) / sigma) ** 2));
+        const total = weights.reduce((sum, weight) => sum + weight, 0);
+        const scratch = new Float32Array(rows * columns);
+
+        // Write the vertical pass back into the band; only one temporary grid is needed.
+        for (const band of Object.values(values)) {
+            for (const horizontal of [true, false]) {
+                const source = horizontal ? band : scratch;
+                const target = horizontal ? scratch : band;
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < columns; col++) {
+                        let sum = 0;
+                        for (let offset = -radius; offset <= radius; offset++) {
+                            const limit = horizontal ? columns : rows;
+                            const index = Math.max(0, Math.min(limit - 1, (horizontal ? col : row) + offset));
+                            const sample = horizontal ? row * columns + index : index * columns + col;
+                            sum += source[sample] * weights[offset + radius];
+                        }
+                        target[row * columns + col] = sum / total;
+                    }
+                }
+            }
+        }
     }
 
     /**
