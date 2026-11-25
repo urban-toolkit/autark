@@ -334,7 +334,7 @@ const scatter = new AutkPlot(document.querySelector('#plotScatter')!, {
 const histogram = new AutkPlot(document.querySelector('#plotHistogram')!, {
   type: 'barchart', collection, attributes: { axis: ['shape_area', '@transform'] },
   transform: { preset: 'binning-1d', options: { bins: 10 } },
-  events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
+  events: [PlotEvent.CLICK, PlotEvent.HOVER],
 });
 
 scatter.events.on(PlotEvent.CLICK, ({ selection }) => {
@@ -345,7 +345,7 @@ scatter.events.on(PlotEvent.HOVER, ({ selection }) => {
   map.setHover('neighborhoods', selection);
   histogram.setHover(selection);
 });
-histogram.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
+histogram.events.on(PlotEvent.CLICK, ({ selection }) => {
   map.setSelection('neighborhoods', selection);
   scatter.setSelection(selection);
 });

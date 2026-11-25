@@ -32,7 +32,7 @@ async function main(): Promise<void> {
         transform: { preset: 'binning-1d', options: { bins: 10 } },
         width: 'auto',
         height: 220,
-        events: [PlotEvent.BRUSH_X, PlotEvent.HOVER],
+        events: [PlotEvent.CLICK, PlotEvent.HOVER],
     });
 
     const highlight = (selection: number[]) => map.setSelection(LAYER, selection);
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
         histogram.setHover(event.selection);
     });
 
-    histogram.events.on(PlotEvent.BRUSH_X, ({ selection }) => {
+    histogram.events.on(PlotEvent.CLICK, ({ selection }) => {
         highlight(selection);
         scatter.setSelection(selection);
     });
