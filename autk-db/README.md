@@ -91,7 +91,7 @@ Missing, incomplete, ambiguous or invalid coastlines produce a clear `console.wa
 
 Both named-area and bbox imports clip roads/parks/water by this surface, even if `surface` is omitted from `layers`. Roads crossing the query boundary or coastal land mask are cropped, including bridges and other roads over water. OSM building parts remain uncut: only parts fully covered by the bbox and surface are retained; partially contained or external parts are discarded. Grouped buildings retain their contained parts with updated geometry indices and OSM element metadata; a building is removed only when no parts remain. Parts touching the boundary but fully contained are retained. This changes the previous optional-surface behavior and can reduce results for named areas. An omitted surface is retained internally for subsequent workspace constraints but excluded from `getLayersMetadata()` and per-layer load timings; it remains inspectable through `getTablesMetadata()`/`getLayer()`. Include `surface` to expose it normally. Overpass caches use `v5` for named queries and `v4` for bbox queries, rejecting older payloads that mixed coastlines into thematic responses or classified only the areas extent.
 
-BBox gallery examples: [`osm-layers-api-bbox`](../gallery/src/autk-map/osm-layers-api-bbox.ts) and [`osm-layers-pbf-bbox`](../gallery/src/autk-map/osm-layers-pbf-bbox.ts).
+BBox and named-area loading is demonstrated by the [PBF gallery example](../gallery/src/autk-map/osm-layers-pbf.html).
 
 ### Typed OpenStreetMap tag sets
 
@@ -118,7 +118,7 @@ A set with no features after clipping has no table or timings entry. Reload repl
 
 Tag sets work with either source. With `pbfFileUrl`, the streaming reader selects matching nodes, ways, and multipolygon relations locally, retaining untagged members for assembly and tagged way vertices without duplicates. The file must contain the required objects; missing data is never fetched from Overpass. Validation allows at most 8 sets, unique lowercase identifier names (up to 32 characters), and 1–64 filters per set. Keys use `[A-Za-z0-9][A-Za-z0-9_:.-]*` (up to 255 characters); values are 1–255 characters without control characters. For the live source, one extra Overpass request acquires all sets, with selectors restricted to requested element families. Cache keys include geometry types and canonical filters, not set names/order; traditional full-data cache entries never satisfy tag requests.
 
-The gallery demonstrates matching named-place, bounding-box, and custom-tag queries through [Overpass in Sol, Madrid](../gallery/src/autk-map/osm-layers-api.html) and a [bundled PBF in La Condamine, Monaco](../gallery/src/autk-map/osm-layers-pbf.html). The tag variants add cafe points and omit buildings from the standard layers.
+The gallery demonstrates named-place, bounding-box, and custom-tag queries with a [bundled PBF in La Condamine, Monaco](../gallery/src/autk-map/osm-layers-pbf.html). `loadOsm()` still supports live Overpass through the `queryArea` path; pass `overpassEndpoint` to use a self-hosted or commercial instance, since the public servers are heavily loaded and some reject third-party use.
 
 ### Building features and spatial joins
 

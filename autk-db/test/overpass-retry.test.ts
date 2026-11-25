@@ -4,7 +4,7 @@ import type { OsmProcessingPipeline } from '../src/internal/process-osm/pipeline
 import { LoadOsmFromOverpassApiUseCase } from '../src/use-cases/load-osm-overpass/use-case';
 
 // Exercise HTTP acquisition without starting DuckDB or contacting the public service.
-let api: { fetchWithRetry(query: string): Promise<Response>; waitForSlot(): Promise<void> };
+let api: { fetchWithRetry(query: string, endpoint?: string): Promise<Response>; waitForSlot(): Promise<void> };
 const query = '[out:json][timeout:60];node(40.700,-74.019,40.714,-74.003);out;';
 
 beforeEach(() => {
@@ -56,6 +56,14 @@ describe('Overpass HTTP retries', () => {
     expect(fetch).toHaveBeenCalledTimes(7);
     expect(console.warn).toHaveBeenCalledTimes(6);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('posts to a configured mirror instead of the public endpoint', async () => {
+    const success = new Response('{"elements":[]}');
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(success);
+    await expect(api.fetchWithRetry(query, 'https://overpass.openstreetmap.fr/api/interpreter/')).resolves.toBe(success);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0][0]).toBe('https://overpass.openstreetmap.fr/api/interpreter');
   });
 
   it('does not retry malformed queries', async () => {

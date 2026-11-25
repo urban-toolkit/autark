@@ -107,6 +107,7 @@ export class LoadOsmFromOverpassApiUseCase {
     const onProgress = params.onProgress;
     const box = isBoundingBoxArea(params.queryArea) ? boundingBoxOf(params.queryArea) : null;
     const tagSets = checkTagSets(params.tagSets);
+    const overpassEndpoint = LoadOsmFromOverpassApiUseCase.resolveEndpoint(params.overpassEndpoint);
 
     const combined = await this.fetchCombinedOsmData(
       params.queryArea,
@@ -114,6 +115,7 @@ export class LoadOsmFromOverpassApiUseCase {
       onProgress,
       params.forceRefresh,
       tagSets,
+      overpassEndpoint,
     );
 
     if (!isBoundingBoxArea(params.queryArea)) {
@@ -219,6 +221,7 @@ export class LoadOsmFromOverpassApiUseCase {
     onProgress?: OnLoadingProgress,
     forceRefresh: boolean = false,
     tagSets: OsmTagSet[] = [],
+    endpoint: string = LoadOsmFromOverpassApiUseCase.DEFAULT_ENDPOINT,
   ): Promise<OverpassApiResponse> {
     const cacheKey = this.getCacheKey(queryArea, layers, tagSets);
     if (!forceRefresh) {
@@ -256,7 +259,7 @@ export class LoadOsmFromOverpassApiUseCase {
       combined.coastlineExtent = boundariesBbox;
     } else {
       console.log('[autk-db] Fetching boundary data from Overpass API…');
-      const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea));
+      const boundariesResponse = await this.fetchWithRetry(this.buildBoundariesQuery(queryArea), endpoint);
       combined = await boundariesResponse.json();
       if (combined.remark) throw new Error(`Overpass boundary query returned incomplete data: ${combined.remark}`);
       const { geocodeExtent } = resolveNamedAreaBoundaries(combined.elements, queryArea, 'OSM');
@@ -267,7 +270,7 @@ export class LoadOsmFromOverpassApiUseCase {
     onProgress?.('downloading-osm-data');
     if (combined.coastlineExtent) {
       await pause(BETWEEN_REQUESTS_MS);
-      const response = await this.fetchWithRetry(this.buildBoundingBoxQuery(combined.coastlineExtent, { way: ['"natural"="coastline"'], relation: [] }));
+      const response = await this.fetchWithRetry(this.buildBoundingBoxQuery(combined.coastlineExtent, { way: ['"natural"="coastline"'], relation: [] }), endpoint);
       const coastData: OverpassApiResponse = await response.json();
       if (coastData.remark) throw new Error(`Overpass coastline query returned incomplete data: ${coastData.remark}`);
       combined.coastlines = coastData.elements ?? [];
@@ -296,7 +299,7 @@ export class LoadOsmFromOverpassApiUseCase {
         for (let t = 0; t < tileQueries.length; t++) {
           await pause(BETWEEN_REQUESTS_MS);
           console.log(`[autk-db] Fetching buildings tile ${t + 1}/${tileQueries.length}…`);
-          const response = await this.fetchWithRetry(tileQueries[t]);
+          const response = await this.fetchWithRetry(tileQueries[t], endpoint);
           const data: OverpassApiResponse = await response.json();
           const count = data.elements?.length ?? 0;
           console.log(`[autk-db] buildings tile ${t + 1}: ${count} elements`);
@@ -315,7 +318,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
       await pause(BETWEEN_REQUESTS_MS);
       console.log(`[autk-db] Fetching ${label} data from Overpass API…`);
-      const response = await this.fetchWithRetry(query);
+      const response = await this.fetchWithRetry(query, endpoint);
       const data: OverpassApiResponse = await response.json();
       const count = data.elements?.length ?? 0;
       console.log(`[autk-db] ${label}: ${count} elements`);
@@ -328,7 +331,7 @@ export class LoadOsmFromOverpassApiUseCase {
 
     if (tagSets.length > 0) {
       await pause(BETWEEN_REQUESTS_MS);
-      const response = await this.fetchWithRetry(this.buildTagSetQuery(queryArea, tagSets));
+      const response = await this.fetchWithRetry(this.buildTagSetQuery(queryArea, tagSets), endpoint);
       const data: OverpassApiResponse = await response.json();
       if ((data.elements?.length ?? 0) === 0) anyGroupEmpty = true;
       combined = this.mergeResponses(combined, data);
@@ -346,8 +349,22 @@ export class LoadOsmFromOverpassApiUseCase {
   // Overpass HTTP — slot checking and retry
   // ---------------------------------------------------------------------------
 
-  private static readonly OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
-  private static readonly OVERPASS_STATUS_ENDPOINT = 'https://overpass-api.de/api/status';
+  /** Public Overpass instance used when the caller does not name one. */
+  private static readonly DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+
+  /** Validates a caller-provided endpoint and strips a trailing slash. */
+  private static resolveEndpoint(endpoint?: string): string {
+    const value = endpoint?.trim() || LoadOsmFromOverpassApiUseCase.DEFAULT_ENDPOINT;
+    let url: URL;
+    try { url = new URL(value); } catch { throw new Error(`Overpass endpoint is not a valid URL: ${value}`); }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Overpass endpoint must use http or https.');
+    return value.replace(/\/+$/, '');
+  }
+
+  /** Status endpoint paired with an interpreter URL; skipped when the mirror does not expose one. */
+  private static statusEndpoint(endpoint: string): string {
+    return endpoint.replace(/\/interpreter$/, '/status');
+  }
 
   // Query [timeout] is stepped down on each consecutive 504 / network rejection
   // to make the request look cheaper to the server.
@@ -361,14 +378,16 @@ export class LoadOsmFromOverpassApiUseCase {
    * Polls the Overpass status endpoint until a slot is free, then returns.
    * Fails silently — a status check error never blocks the actual request.
    */
-  private async waitForSlot(): Promise<void> {
+  private async waitForSlot(endpoint: string = LoadOsmFromOverpassApiUseCase.DEFAULT_ENDPOINT): Promise<void> {
     const POLL_INTERVAL_MS = 3_000;
     const MAX_CHECKS = 60; // bail out after ~3 min of polling
     const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
     for (let check = 0; check < MAX_CHECKS; check++) {
       try {
-        const res = await fetch(LoadOsmFromOverpassApiUseCase.OVERPASS_STATUS_ENDPOINT);
+        const status = LoadOsmFromOverpassApiUseCase.statusEndpoint(endpoint);
+        if (status === endpoint) return;
+        const res = await fetch(status);
         if (!res.ok) return;
         const text = await res.text();
 
@@ -403,18 +422,18 @@ export class LoadOsmFromOverpassApiUseCase {
    * All backoff values have ±10% jitter. The fetch-level AbortController
    * deadline is derived from the current query [timeout] + 30s overhead.
    */
-  private async fetchWithRetry(query: string): Promise<Response> {
+  private async fetchWithRetry(query: string, endpoint: string = LoadOsmFromOverpassApiUseCase.DEFAULT_ENDPOINT): Promise<Response> {
+    endpoint = LoadOsmFromOverpassApiUseCase.resolveEndpoint(endpoint);
     const MAX_RETRIES = 6;
     const FETCH_OVERHEAD_MS = 30_000;
     const BACKOFF_429_MS = [20_000,  45_000,  90_000, 120_000, 180_000, 240_000];
     const BACKOFF_504_MS = [10_000,  20_000,  45_000,  90_000, 120_000, 180_000];
 
-    const endpoint = LoadOsmFromOverpassApiUseCase.OVERPASS_ENDPOINT;
     const jitter = (ms: number) => ms * (0.9 + Math.random() * 0.2);
     const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
     const isRetryable = (status: number) => status === 429 || status === 502 || status === 503 || status === 504;
 
-    await this.waitForSlot();
+    await this.waitForSlot(endpoint);
 
     let consecutive504s = 0;
 

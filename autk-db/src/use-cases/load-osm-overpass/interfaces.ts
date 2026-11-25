@@ -135,6 +135,8 @@ export type LoadOsmParams = {
   queryArea: OsmQueryArea;
   /** Tag-selected layers from Overpass or the bundled PBF, clipped to the mandatory surface. Each set requires one geometry type. */
   tagSets?: OsmTagSet[];
+  /** Overpass interpreter URL. Defaults to the public `overpass-api.de` endpoint; use a mirror or a self-hosted instance when it is unavailable. */
+  overpassEndpoint?: string;
   /** If provided, OSM data is loaded from this `.osm.pbf` file instead of the Overpass API. */
   pbfFileUrl?: string;
   /** When true, bypasses the cached Overpass response and fetches fresh data. */
