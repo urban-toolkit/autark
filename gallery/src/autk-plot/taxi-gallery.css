@@ -1,0 +1,27 @@
+.taxi-study .taxi-analysis { display: grid; gap: 14px; min-width: 0; }
+.taxi-study .taxi-cohorts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.taxi-study .taxi-cohorts > div { min-width: 0; }
+.taxi-study .taxi-cohorts > div + div { border-inline-start: 1px solid #dde6eb; }
+.taxi-study .taxi-cohorts h3 { margin: 8px 16px 0; font-size: 13px; color: #126a82; }
+.taxi-study .taxi-cohorts > div + div h3 { color: #ad501f; }
+.taxi-study .details-panel > .panel-header, .taxi-study .map-panel > .panel-header { background: #edf4f6; }
+.taxi-study .plot-body { padding: 6px 7px; min-height: 0; }
+.taxi-study .taxi-query { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; background: #f5f8fa; }
+.taxi-study .taxi-query label { display: flex; flex: 1 1 170px; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 650; }
+.taxi-study .taxi-query select { max-width: 100%; min-width: 0; font: inherit; padding: 6px; }
+.taxi-study .map-stage { min-height: clamp(340px, 49vh, 540px); }
+.taxi-study .taxi-method { margin: 14px 0 26px; color: #425765; font-size: 13px; }
+/* The taxi controls add a fourth row, so these panels cannot use the shared three-row subgrid. */
+.gallery-example.taxi-study #app.taxi-workspace { grid-template-rows: auto; gap: 20px; }
+.gallery-example.taxi-study .taxi-workspace > .map-panel { display: block; grid-row: auto; align-self: start; }
+@media (min-width: 901px) {
+    .gallery-example.taxi-study #app.taxi-workspace { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: stretch; }
+    .gallery-example.taxi-route #app.taxi-workspace { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); align-items: start; }
+    /* The airport map spans the two stacked charts, so its stage takes their remaining height. */
+    .gallery-example.taxi-airports .taxi-workspace > .map-panel { display: flex; flex-direction: column; align-self: stretch; }
+    .gallery-example.taxi-airports .taxi-workspace > .map-panel > .map-stage { flex: 1 1 auto; min-height: 300px; }
+}
+@media (max-width: 630px) {
+    .taxi-study .taxi-cohorts { grid-template-columns: minmax(0, 1fr); }
+    .taxi-study .taxi-cohorts > div + div { border-inline-start: 0; border-block-start: 1px solid #dde6eb; }
+}

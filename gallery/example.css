@@ -139,9 +139,9 @@ button, input, select { font: inherit; }
 .details-panel > .panel-header { border-bottom: 1px solid var(--border); }
 .details-body { padding: 24px 20px; }
 .data-note { margin: 0; border-top: 1px solid var(--border); padding: 16px 20px; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1.7; }
-.gallery-example #plotBody { margin: 0; padding: 20px; width: 100%; min-width: 0; overflow: auto; }
-.gallery-chart #plotBody { min-height: 240px; }
-.gallery-chart #plotBody > svg { display: block; width: 100%; height: auto; }
+.gallery-example :is(#plotBody, .plot-body) { margin: 0; padding: 20px; width: 100%; min-width: 0; overflow: auto; }
+.gallery-chart :is(#plotBody, .plot-body) { min-height: 240px; }
+.gallery-chart :is(#plotBody, .plot-body) > svg { display: block; width: 100%; height: auto; }
 @media (max-width: 900px) {
     .gallery-example #app.example-workspace, .gallery-example #app.chart-workspace { grid-template-columns: minmax(0, 1fr); }
     .gallery-example .chart-workspace > .details-panel { align-self: start; }
@@ -302,9 +302,9 @@ button, input, select { font: inherit; }
 
 /* Linked charts use the available panel width. */
 
-.gallery-chart #plotBody svg { border: 0 !important; }
-.gallery-chart #plotBody .tick line { stroke-width: 1px; stroke: #dfdfdf; }
-.gallery-chart #plotBody .title { font-size: 12px; fill: #333; }
+.gallery-chart :is(#plotBody, .plot-body) svg { border: 0 !important; }
+.gallery-chart :is(#plotBody, .plot-body) .tick line { stroke-width: 1px; stroke: #dfdfdf; }
+.gallery-chart :is(#plotBody, .plot-body) .title { font-size: 12px; fill: #333; }
 
 /* Poster controls and export preview stay scoped to the poster workspace. */
 

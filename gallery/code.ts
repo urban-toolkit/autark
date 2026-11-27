@@ -112,6 +112,46 @@ map.loadTerrain({ source: TERRAIN_TILE_SOURCES.awsTerrarium });`;
         case 'T04': return `await db.loadGeoTiff({ geotiffFileUrl: '/data/niteroi-elevation.tif',
   sourceCrs: 'EPSG:3395', outputTableName: 'elevation' });
 map.loadTerrain({ source: { collection: await db.getRaster('elevation'), property: 'band_1' } });`;
+        case 'P10': return `const timeline = new AutkPlot(timelineHost, {
+  type: 'linechart', collection,
+  attributes: { axis: ['hourly'], series: 'group' },
+  transform: { preset: 'reduce-series', options: { reducer: 'sum' } },
+  scales: { x: { domain: hours } },
+  events: [PlotEvent.CLICK, PlotEvent.BRUSH],
+});
+timeline.setAnnotations([
+  { id: 'overnight', type: 'band', x: [hours[0], hours[5]], label: 'Overnight' },
+  { id: 'mean', type: 'line', y: 'mean', label: 'Mean hourly rate' },
+  { id: 'peak', type: 'point', series: 'Weekends', x: hours[peak], label: 'Weekend peak' },
+]);
+// The hexbin and line chart share original report indexes, not aggregate rows.
+timeline.events.on(PlotEvent.BRUSH, ({ selection }) => locations.setSelection(selection));
+locations.events.on(PlotEvent.CLICK, ({ selection }) => timeline.setSelection(selection));`;
+        case 'P11': return `const timeline = new AutkPlot(timelineHost, {
+  type: 'linechart', collection: profile(trips),
+  attributes: { axis: ['series'], series: 'airport' },
+  transform: { preset: 'reduce-series' },
+  scales: { x: { domain: hourBuckets } },
+  events: [PlotEvent.BRUSH_X],
+});
+timeline.events.on(PlotEvent.BRUSH_X, ({ extent }) => {
+  const x = extent?.data?.x;
+  const selected = x?.kind === 'categorical' ? new Set(x.keys.map(key => hourBuckets.indexOf(key))) : null;
+  histogram.updateCollection(distribution(trips, selected));
+});`;
+        case 'P12': return `// Use the same numeric domains in both cohorts for a fair comparison.
+const weekday = new AutkPlot(weekdayHost, {
+  type: 'scatterplot', collection: weekdayTrips, scales: bounds,
+  attributes: { axis: ['minutes', 'fare'] }, events: [PlotEvent.BRUSH],
+});
+weekday.setAnnotations([
+  { id: 'fit', type: 'line', fit: 'linear', label: 'Fit' },
+  { id: 'centroid', type: 'point', x: 'mean', y: 'mean', label: 'Centroid' },
+]);
+// The hourly view stores weekday trips first; weekend IDs are offset accordingly.
+weekday.events.on(PlotEvent.BRUSH, ({ selection }) => hourly.setSelection(selection));
+weekend.events.on(PlotEvent.BRUSH, ({ selection }) =>
+  hourly.setSelection(selection.map(id => id + weekdayTrips.features.length)));`;
         case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'CLICK');
         case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'BRUSH');
         case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");

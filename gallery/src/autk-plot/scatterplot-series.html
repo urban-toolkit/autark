@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Manhattan’s noise rhythms</title>
+    <link rel="stylesheet" href="../../example.css" />
+    <link rel="stylesheet" href="./noise-rhythm.css" />
+</head>
+
+<body class="gallery-example gallery-chart noise-story">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-plot/">Chart guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-plot <span aria-hidden="true">/</span> Linked plots</p>
+            <h1 id="example-title">Manhattan’s noise rhythms</h1>
+            <p class="description">When do weekdays and weekends sound different? Follow peaks in reported noise from the clock to the city.</p>
+        </section>
+        <div id="app" class="example-workspace chart-workspace">
+            <section class="details-panel" aria-labelledby="timeline-heading">
+                <div class="panel-header"><h2 id="timeline-heading">01 / When reports arrive</h2><p class="map-status" role="status" data-example-status>Loading charts…</p></div>
+                <div id="noiseTimeline" class="plot-body"></div>
+                <p class="data-note">Click an hourly point or drag across the chart. Click empty space in the location view to clear the selection. Rates are normalized by the number of calendar days.</p>
+            </section>
+            <section class="details-panel" aria-labelledby="location-heading">
+                <div class="panel-header"><h2 id="location-heading">02 / Where reports cluster</h2></div>
+                <div id="noiseLocations" class="plot-body"></div>
+                <p class="data-note">Darker cells contain more reports. Click a cell to trace its reports back to the hourly profiles.</p>
+            </section>
+        </div>
+        <p class="noise-method"><a href="../../data/noise_manhattan_clean.csv">Download the bundled sample</a>. March 2025. These are reports, not sound measurements. The charts describe this sample, not all Manhattan noise.</p>
+        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="/src/autk-plot/scatterplot-series.ts"></script>
+</body>
+</html>

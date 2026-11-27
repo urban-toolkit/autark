@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Two airports, one destination</title>
+    <link rel="stylesheet" href="../../example.css" />
+    <link rel="stylesheet" href="./taxi-gallery.css" />
+</head>
+<body class="gallery-example gallery-chart taxi-study taxi-airports">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-plot/">Chart guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-plot <span aria-hidden="true">/</span> TaxiVis-inspired</p>
+            <h1 id="example-title">Two airports, one destination</h1>
+            <p class="description">When is a yellow cab from JFK or LaGuardia faster to the same part of Midtown? Compare the hourly medians, then brush a time window to see how much the travel times overlap.</p>
+        </section>
+        <div id="app" class="example-workspace chart-workspace taxi-workspace">
+            <section class="map-panel" aria-labelledby="taxi-map-title">
+                <div class="panel-header"><h2 id="taxi-map-title">01 / Choose a destination</h2><p id="taxi-map-status" class="map-status" role="status">Loading map…</p></div>
+                <div class="taxi-query"><label>Drop-off zone <select id="taxi-destination"></select></label></div>
+                <div class="map-stage"><canvas id="taxi-map" aria-label="New York City taxi zones and airport-to-destination links"></canvas></div>
+                <div class="panel-footer"><span>Route colors match the charts. Double-click a Midtown zone to change the destination.</span></div>
+            </section>
+            <div class="taxi-analysis">
+                <section class="details-panel" aria-labelledby="taxi-time-title">
+                    <div class="panel-header"><h2 id="taxi-time-title">02 / Compare pickup hours</h2><p id="taxi-route-status" class="map-status" role="status" data-example-status>Loading taxi trips…</p></div>
+                    <div id="taxi-timeline" class="plot-body"></div>
+                    <p id="taxi-point-status" class="data-note">Each point summarizes one airport and pickup hour.</p>
+                </section>
+                <section class="details-panel" aria-labelledby="taxi-dist-title">
+                    <div class="panel-header"><h2 id="taxi-dist-title">03 / Compare the spread</h2></div>
+                    <div id="taxi-distribution" class="plot-body"></div>
+                    <p id="taxi-hours-status" class="data-note" role="status">Showing all pickup hours.</p>
+                </section>
+            </div>
+        </div>
+        <p class="taxi-method">January 2024 yellow taxi trips from <a href="https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page">NYC TLC</a>, filtered to this demo’s zones and trips of 1–120 minutes with a metered fare above $0 and at most $300. Lines connect taxi zones, not GPS routes. Inspired by <a href="https://visualdslab.com/papers/TaxiVis/">TaxiVis</a>.</p>
+        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="/src/autk-plot/bubble-annotations.ts"></script>
+</body>
+</html>

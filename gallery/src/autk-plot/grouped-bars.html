@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autark — Same route, different ride</title>
+    <link rel="stylesheet" href="../../example.css" />
+    <link rel="stylesheet" href="./taxi-gallery.css" />
+</head>
+<body class="gallery-example gallery-chart taxi-study taxi-route">
+    <a class="skip-link" href="#main">Skip to example</a>
+    <header class="site-header">
+        <nav class="navigation" aria-label="Main navigation">
+            <a class="wordmark" href="../../index.html">Autark<span>Gallery</span></a>
+            <a class="guide-link" href="https://autarkjs.org/autk-plot/">Chart guide <span aria-hidden="true">↗</span></a>
+        </nav>
+    </header>
+    <main id="main" class="example-main">
+        <a class="back-link" href="../../index.html"><span aria-hidden="true">←</span> All examples</a>
+        <section class="introduction" aria-labelledby="example-title">
+            <p class="eyebrow">autk-plot <span aria-hidden="true">/</span> TaxiVis-inspired</p>
+            <h1 id="example-title">Same route, different ride</h1>
+            <p class="description">Do longer rides cost more in the same way on weekdays and weekends? Pick a route, compare the two fitted lines, and brush unusual fares to find out when those trips started.</p>
+        </section>
+        <div id="app" class="example-workspace chart-workspace taxi-workspace">
+            <section class="map-panel" aria-labelledby="taxi-map-title">
+                <div class="panel-header"><h2 id="taxi-map-title">01 / Set the route</h2><p id="taxi-map-status" class="map-status" role="status">Loading map…</p></div>
+                <div class="taxi-query">
+                    <label>Pickup zone <select id="taxi-pickup"></select></label>
+                    <label>Drop-off zone <select id="taxi-destination"></select></label>
+                    <label>Map picks <select id="taxi-role"><option value="pickup">Set pickup</option><option value="destination">Set drop-off</option></select></label>
+                </div>
+                <div class="map-stage"><canvas id="taxi-map" aria-label="New York City taxi zones and selected origin–destination link"></canvas></div>
+                <div class="panel-footer"><span>Drag to pan · Scroll to zoom · Double-click a taxi zone</span></div>
+            </section>
+            <div class="taxi-analysis">
+                <section class="details-panel" aria-labelledby="taxi-comparison-title">
+                    <div class="panel-header"><h2 id="taxi-comparison-title">02 / Compare duration and fare</h2><p id="taxi-route-status" class="map-status" role="status" data-example-status>Loading taxi trips…</p></div>
+                    <div class="taxi-cohorts">
+                        <div><h3>Weekdays</h3><div id="taxi-weekday" class="plot-body"></div></div>
+                        <div><h3>Weekends</h3><div id="taxi-weekend" class="plot-body"></div></div>
+                    </div>
+                    <p class="data-note">Both panels share scales. Each dot is a real trip; each ring marks that cohort’s mean duration and mean fare.</p>
+                </section>
+                <section class="details-panel" aria-labelledby="taxi-hour-title">
+                    <div class="panel-header"><h2 id="taxi-hour-title">03 / Follow the selection to the clock</h2><p id="taxi-sample-status" class="map-status" role="status"></p></div>
+                    <div id="taxi-hourly" class="plot-body"></div>
+                    <p class="data-note">Brush a scatterplot to highlight its pickup hours here, or click an hourly bar to highlight trips in both cohorts.</p>
+                </section>
+            </div>
+        </div>
+        <p class="taxi-method">January 2024 yellow taxi trips from <a href="https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page">NYC TLC</a>, filtered to 1–120 minutes and a metered fare above $0 and at most $300. Each panel uses up to 400 deterministically sampled trips; the fit and centroid describe that sample. Lines on the map connect taxi zones, not GPS routes. Inspired by <a href="https://visualdslab.com/papers/TaxiVis/">TaxiVis</a>.</p>
+        <footer class="page-footer">Made with Autark · Rendered in your browser</footer>
+    </main>
+    <script type="module" src="/src/autk-plot/grouped-bars.ts"></script>
+</body>
+</html>

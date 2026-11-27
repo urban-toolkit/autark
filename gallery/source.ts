@@ -1,8 +1,12 @@
 import { ROAD_LENGTH_WGSL } from './src/autk-map/road-length';
+import referenceDataSource from './src/autk-plot/reference-data.ts?raw';
+import noiseStorySource from './src/autk-plot/scatterplot-series.ts?raw';
+import airportsStorySource from './src/autk-plot/bubble-annotations.ts?raw';
+import routeStorySource from './src/autk-plot/grouped-bars.ts?raw';
 
 /**
  * Minimal runnable programs shown under "Minimal runnable example".
- * Each assumes an HTML page containing a <canvas> (and `#plotBody` for charts).
+ * Use a <canvas> for maps and the host IDs shown in the source for charts.
  */
 export function exampleSource(id: string, state: Record<string, string>): string {
     const provider = state['source-select'] || 'osmLight';
@@ -307,6 +311,17 @@ await db.loadGeoTiff({
 map.setView({ center: { latitude: -22.9, longitude: -43.1 }, zoom: 13 });
 map.loadTerrain({ source: { collection: await db.getRaster('elevation'), property: 'band_1' } });
 map.draw();`;
+        case 'P10': return noiseStorySource
+            .replace("import { onExampleDispose, runExample } from '../example';\n", '')
+            .replace('void runExample(async () => onExampleDispose(await main()), true);', 'await main();');
+        case 'P11':
+        case 'P12': {
+            const chart = id === 'P11' ? airportsStorySource : routeStorySource;
+            const body = chart.replace(/^import .* from '\.\.?\/.*';\n/gm, '')
+                .replace('void runExample(async () => onExampleDispose(await main()), true);', 'await main();');
+            const helpers = referenceDataSource.replace("import { lonLatToCrs } from '@urban-toolkit/autk-core';", "import { ColorMapDomainStrategy, lonLatToCrs } from '@urban-toolkit/autk-core';");
+            return `${helpers}\n${body.replace("import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';\n", '')}`;
+        }
         case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'CLICK');
         case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'BRUSH');
         case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");
