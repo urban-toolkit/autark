@@ -39,16 +39,19 @@ export const barchart: PlotDefinition = {
     // even when there are too few bars for the geometry to prove it.
     highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
-    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount, style, xTickLabel }) {
+    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount, style, xTickLabel, scaleDomain, visibleRows }) {
         const label = (row: AutkDatum) => String(value(row, 0));
         const amount = (row: AutkDatum) => Number(value(row, 1)) || 0;
 
         const padding = style?.barPadding ?? 0.25;
-        const x = d3.scaleBand(rows.map(label), [0, width]).padding(padding >= 0 && padding <= 1 ? padding : 0.25);
-        // An empty result (e.g. everything filtered out) keeps a finite [0, 1] axis.
+        const xDomain = scaleDomain?.('x', 'categorical');
+        const yDomain = scaleDomain?.('y', 'numeric');
+        const x = d3.scaleBand(xDomain ?? rows.map(label), [0, width]).padding(padding >= 0 && padding <= 1 ? padding : 0.25);
+        const shown = xDomain ? visibleRows?.(row => x(label(row)) !== undefined) ?? rows : rows;
         // A subset statistic (avg, min, max) may exceed every bar.
         const beyond = partRange && !partRange.additive ? partRange.extent[1] : 0;
-        const y = d3.scaleLinear([0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
+        const y = d3.scaleLinear(yDomain ?? [0, Math.max(d3.max(rows, amount) ?? 0, 1, beyond)], [height, 0]);
+        const baseline = y(0);
 
         // Keep band keys intact. Shorten floating-point artifacts only on raw numeric labels,
         // and keep the original text if shortening would make two categories look identical.
@@ -85,13 +88,13 @@ export const barchart: PlotDefinition = {
         axisY(d3.axisLeft(y).ticks(tickCount(y.domain()[1], rows.map(amount), 10)).tickSizeInner(-width).tickFormat(format(1)));
 
         group.selectAll('rect.autkMark')
-            .data(rows)
+            .data(shown)
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', row => x(label(row)) ?? 0)
             .attr('width', x.bandwidth())
-            .attr('y', row => y(amount(row)))
-            .attr('height', row => height - y(amount(row)))
+            .attr('y', row => yDomain ? Math.min(baseline, y(amount(row))) : y(amount(row)))
+            .attr('height', row => yDomain ? Math.abs(baseline - y(amount(row))) : height - y(amount(row)))
             .style('stroke', '#2f2f2f')
             .append('title')
             .text(row => `${label(row)}: ${d3.format('~s')(amount(row))}`);

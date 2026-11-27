@@ -26,6 +26,8 @@ export type {
 	DensityTransformConfig,
 	RegisteredTransformConfig,
 	PlotConfig,
+	NumericPlotDomain,
+	PlotScaleDomain,
 	PlotType,
 	UnifiedPlotConfig,
 } from './api';

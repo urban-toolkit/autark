@@ -84,6 +84,30 @@ Compact scatterplots, bar charts, and line charts request fewer numeric ticks by
 
 For bar, line, and area charts, `ticks.x.label` receives the raw category or bucket key and overrides the default label and numeric format. Return `''` to leave a bar tick unlabeled or to omit a line or area tick. For example, `ticks: { x: { label: key => key === '2024-03-02' ? 'Launch day' : '' } }` labels only the launch bucket. Without a callback, date and timestamp buckets use short UTC labels such as `Mar 2`; timestamp spans of four days or less also show the hour, such as `Mar 2 06h`. Month and year buckets retain their keys. Labels do not change the data or selection keys.
 
+### Manual scale domains
+
+Plots infer domains by default. Set `scales` to override only the channels you need. For example, this bar chart orders its categories and fixes the Y axis to `[0, 1]`:
+
+```ts
+scales: {
+    x: { domain: ['Low', 'Medium', 'High'] },
+    y: { domain: [0, 1] },
+}
+```
+
+Numeric domains must have two finite, increasing bounds. Marks are clipped to the plot area, not filtered before aggregation. Categorical domains use an ordered list of unique string keys: missing categories get empty slots, and categories left out of the list are not drawn. Use the original category or bucket keys, not formatted tick labels. Scale types and pixel ranges are unchanged.
+
+| Plot | Supported domains |
+| --- | --- |
+| Bar, stacked bar, box, violin | Categorical `x`, numeric `y` |
+| Scatter, bubble | Numeric `x` and `y`; bubble also supports numeric `size` |
+| Line, area | Categorical `x` (equally spaced buckets), numeric `y` |
+| Heat matrix | Categorical `x` and `y` (category or bucket keys) |
+| Density, hexbin | Numeric `x` and `y`; domains do not recompute the density or bins |
+| Parallel coordinates | Numeric or categorical `scales.dimensions[field].domain`, matching the field's scale |
+
+For bubbles, `scales.size.domain` must be nonnegative. Values outside it use the nearest endpoint radius. For colors, use `style.colorMap.domainSpec` instead.
+
 ### Plot appearance
 
 Use `style` for per-plot appearance overrides. `style.radius` sets a fixed scatterplot point radius in pixels. Omit it or pass a nonpositive or nonfinite value to keep the 5 px default. It does not affect bubble sizes. Use `style.columnFormats` on tables to set D3 number formats by column field. `style.barPadding` controls bar-chart band spacing from `0` (no padding) to `1` (full padding); the default is `0.25` and invalid values fall back to it.

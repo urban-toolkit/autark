@@ -72,7 +72,7 @@ export function pointTitle(context: PlotDrawContext, count: number): (row: AutkD
  * @returns The x and y scales.
  */
 export function gridAxes(context: PlotDrawContext): [d3.ScaleLinear<number, number>, d3.ScaleLinear<number, number>] {
-    const { rows, value, width, height, format, axisX, axisY } = context;
+    const { rows, value, width, height, format, axisX, axisY, scaleDomain } = context;
     // Rows with no number on an axis (such as the cells of binning-2d) would all sit at zero.
     for (const index of [0, 1]) {
         if (rows.length > 0 && !rows.some(row => Number.isFinite(Number(value(row, index))) && value(row, index) !== '')) {
@@ -80,8 +80,8 @@ export function gridAxes(context: PlotDrawContext): [d3.ScaleLinear<number, numb
         }
     }
     const extent = (index: number) => d3.extent(rows, (row: AutkDatum) => Number(value(row, index)) || 0) as [number, number];
-    const x = d3.scaleLinear(extent(0), [0, width]);
-    const y = d3.scaleLinear(extent(1), [height, 0]);
+    const x = d3.scaleLinear(scaleDomain?.('x', 'numeric') ?? extent(0), [0, width]);
+    const y = d3.scaleLinear(scaleDomain?.('y', 'numeric') ?? extent(1), [height, 0]);
 
     axisX(d3.axisBottom(x).tickSizeInner(-height).tickFormat(format(0)));
     axisY(d3.axisLeft(y).tickSizeInner(-width).tickFormat(format(1)));

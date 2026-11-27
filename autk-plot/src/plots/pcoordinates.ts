@@ -33,17 +33,25 @@ export const parallelCoordinates: PlotDefinition = {
     markStyle: (_row, highlighted) => ({ opacity: highlighted ? 1 : 0.7, 'stroke-width': highlighted ? 3 : 2 }),
     highlight: { stroke: { mode: 'custom', preset: 'trace' } },
 
-    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy, interactive, setBrushScale }) {
+    draw({ svg, group, rows, fields, value, width, height, margins, format, axisLabels, colorAttribute, colorBy, interactive,
+        setBrushScale, scaleDomain, visibleRows }) {
         // A scale per axis: linear when every value is a number, points otherwise.
+        const categoriesByIndex = new Map<number, Set<string>>();
         const scales = new Map<string, AxisScale>(fields.map((field, index): [string, AxisScale] => {
             const values = rows.map(row => value(row, index)).filter(v => v !== null && v !== undefined);
-            if (values.every(v => !isNaN(Number(v)))) {
-                const extent = d3.extent(rows, row => Number(value(row, index)) || 0) as [number, number];
+            const domain = values.length === 0 ? scaleDomain?.('dimension', 'either', field) : undefined;
+            if (domain ? typeof domain[0] === 'number' : values.every(v => !isNaN(Number(v)))) {
+                const extent = scaleDomain?.('dimension', 'numeric', field)
+                    ?? d3.extent(rows, row => Number(value(row, index)) || 0) as [number, number];
                 return [field, { numeric: true, scale: d3.scaleLinear(extent, [height, 0]) }];
             }
-            const categories = Array.from(new Set(rows.map(row => String(value(row, index)))));
+            const manual = scaleDomain?.('dimension', 'categorical', field);
+            if (manual) categoriesByIndex.set(index, new Set(manual));
+            const categories = manual ?? Array.from(new Set(rows.map(row => String(value(row, index)))));
             return [field, { numeric: false, scale: d3.scalePoint(categories, [height, 0]).padding(0.5) }];
         }));
+        const categoryDomains = [...categoriesByIndex];
+        const shown = categoryDomains.length ? visibleRows?.(row => categoryDomains.every(([index, keys]) => keys.has(String(value(row, index))))) ?? rows : rows;
         const x = d3.scalePoint(fields, [0, width]).padding(0.1);
         const yOf = (row: AutkDatum, field: string, index: number) => {
             const axis = scales.get(field)!;
@@ -52,7 +60,7 @@ export const parallelCoordinates: PlotDefinition = {
         const line = d3.line<[number, number]>();
 
         group.selectAll('path.autkMark')
-            .data(rows)
+            .data(shown)
             .join('path')
             .attr('class', 'autkMark')
             .attr('d', row => line(fields.map((field, index) => [x(field) ?? 0, yOf(row, field, index)])) ?? '')

@@ -42,13 +42,15 @@ export const violin: PlotDefinition = {
     },
     highlight: { rect: { mode: 'subset', channel: 'length', axis: 'x', anchor: 'center' } },
 
-    draw({ group, rows, width, height, axisX, axisY, format }) {
+    draw({ group, rows, width, height, axisX, axisY, format, scaleDomain, visibleRows }) {
         const points = rows.map(pointOf);
         const groups = Array.from(new Set(points.map(p => p.group)));
+        const xDomain = scaleDomain?.('x', 'categorical');
         // Categories across, values up; all violins share one density scale.
-        const x = d3.scaleBand(groups, [0, width]).padding(0.15);
+        const x = d3.scaleBand(xDomain ?? groups, [0, width]).padding(0.15);
+        const shown = xDomain ? visibleRows?.(row => x(pointOf(row).group) !== undefined) ?? rows : rows;
         const [lo, hi] = d3.extent(points, p => p.x) as [number | undefined, number | undefined];
-        const y = d3.scaleLinear([lo ?? 0, hi ?? 1], [height, 0]);
+        const y = d3.scaleLinear(scaleDomain?.('y', 'numeric') ?? [lo ?? 0, hi ?? 1], [height, 0]);
         const widthPerDensity = (x.bandwidth() / 2) / (d3.max(points, p => p.value) || 1);
 
         axisX(d3.axisBottom(x).tickSizeOuter(0));
@@ -56,8 +58,8 @@ export const violin: PlotDefinition = {
 
         // Strips: each grid point covers half the way to its neighbors.
         const strips = new Map<AutkDatum, { cx: number; half: number; y0: number; y1: number }>();
-        for (const name of groups) {
-            const curve = rows.filter(row => pointOf(row).group === name);
+        for (const name of x.domain()) {
+            const curve = shown.filter(row => pointOf(row).group === name);
             const cx = (x(name) ?? 0) + x.bandwidth() / 2;
             curve.forEach((row, k) => {
                 const p = pointOf(row);
@@ -69,7 +71,7 @@ export const violin: PlotDefinition = {
         const strip = (row: AutkDatum) => strips.get(row)!;
 
         group.selectAll('rect.autkMark')
-            .data(rows.filter(row => pointOf(row).value > 0))
+            .data(shown.filter(row => pointOf(row).value > 0))
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', row => strip(row).cx - strip(row).half)

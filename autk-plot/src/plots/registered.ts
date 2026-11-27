@@ -16,7 +16,7 @@ import * as d3 from 'd3';
 import { valueAtPath } from '@urban-toolkit/autk-core';
 import type { ColorMapInterpolator } from '@urban-toolkit/autk-core';
 
-import type { PlotConfig, PlotMargins, PlotTransformConfig, TransformReducer } from '../api';
+import type { NumericPlotDomain, PlotConfig, PlotMargins, PlotScaleDomain, PlotTransformConfig, TransformReducer } from '../api';
 import type { ResolvedPlotTransform } from '../plot-base-data';
 import type { ExecutedPlotTransform } from '../transforms';
 import type { AutkDatum } from '../types-plot';
@@ -35,6 +35,16 @@ import { freezeDefinition, registeredTransform, transformOf } from '../transform
 
 import { centerOf, drawAutoPart, htmlFill, inferHighlight, markKindOf, outline, ratioOf, ruleOf, seriesPath, withDeclaredHighlight } from './partial-design';
 import type { AutoPartContext, CustomPreset, HighlightDesign, HighlightRule, MarkKind, SubsetChannel } from './partial-design';
+
+type ScaleChannel = 'x' | 'y' | 'size' | 'dimension';
+
+type ResolvePlotDomain = {
+    (channel: ScaleChannel, kind: 'numeric', field?: string): NumericPlotDomain | undefined;
+    (channel: ScaleChannel, kind: 'categorical', field?: string): readonly string[] | undefined;
+    (channel: ScaleChannel, kind: 'either', field?: string): PlotScaleDomain | undefined;
+};
+
+let nextPlotClipId = 0;
 
 /** What a registered plot's `draw` receives. */
 export type PlotDrawContext = {
@@ -56,6 +66,10 @@ export type PlotDrawContext = {
     interactive: boolean;
     /** Appearance overrides for this plot. */
     style?: PlotConfig['style'];
+    /** Resolves a configured display domain and clips marks for explicit numeric axes. */
+    scaleDomain?: ResolvePlotDomain;
+    /** Keeps only the rows in the display domain without changing the transform or its provenance. */
+    visibleRows?: (includes: (row: AutkDatum) => boolean) => AutkDatum[];
     /** Optional custom label for a category or bucket on the X axis. */
     xTickLabel?: (key: string) => string;
     /** Supplies a brush scale for an axis drawn manually or positioned by bucket rank. */
@@ -563,6 +577,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         definition.validate?.(config);
         this.definition = definition;
         this._ticks = config.ticks;
+        this._scales = config.scales;
         this._defaultNumericInterpolator = definition.defaultNumericInterpolator ?? this._defaultNumericInterpolator;
         this._colorProperty = definition.color ?? 'fill';
         const configured: unknown = config.provenance?.highlight;
@@ -679,6 +694,33 @@ export class RegisteredPlot extends PlotBaseInteractive {
 
         const fields = this.renderAxisAttributes;
         const reducer = this._provenance.reducer;
+        const omitted = new Set<AutkDatum>();
+        let hasCategoricalOverride = false;
+        let clipId: string | undefined;
+        const scaleDomain = ((channel: ScaleChannel, kind: 'numeric' | 'categorical' | 'either', field?: string) => {
+            const entry = channel === 'dimension' ? this._scales?.dimensions?.[field ?? ''] : this._scales?.[channel];
+            const domain = entry?.domain;
+            if (domain === undefined) return undefined;
+            const numeric = Array.isArray(domain) && domain.length === 2
+                && domain.every(value => typeof value === 'number' && Number.isFinite(value))
+                && Number(domain[0]) < Number(domain[1]) && (channel !== 'size' || Number(domain[0]) >= 0);
+            const categorical = Array.isArray(domain) && domain.every(value => typeof value === 'string')
+                && new Set(domain).size === domain.length;
+            if (kind === 'numeric' ? !numeric : kind === 'categorical' ? !categorical : !numeric && !categorical) {
+                const path = channel === 'dimension' ? `dimensions.${field}` : channel;
+                const expected = kind === 'numeric' ? 'finite increasing bounds' : kind === 'categorical'
+                    ? 'an ordered list of unique strings' : 'finite increasing bounds or an ordered list of unique strings';
+                throw new Error(`scales.${path}.domain must be ${expected}${channel === 'size' ? ' (nonnegative)' : ''}.`);
+            }
+            if (categorical) hasCategoricalOverride = true;
+            if (numeric && channel !== 'size' && !clipId) {
+                clipId = `autk-plot-clip-${++nextPlotClipId}`;
+                svg.append('defs').append('clipPath').attr('id', clipId)
+                    .append('rect').attr('width', width).attr('height', height);
+                group.attr('clip-path', `url(#${clipId})`);
+            }
+            return domain;
+        }) as ResolvePlotDomain;
         this._baseColor = this.definition.baseColor?.(this._data);
         const drawn = this.definition.draw({
             svg: d3.select(svgNode),
@@ -688,6 +730,12 @@ export class RegisteredPlot extends PlotBaseInteractive {
             fields,
             interactive: this._enabledEvents.length > 0,
             style: this._style,
+            scaleDomain,
+            visibleRows: includes => !hasCategoricalOverride ? this._data : this._data.filter(row => {
+                if (includes(row)) return true;
+                omitted.add(row);
+                return false;
+            }),
             xTickLabel: this._ticks?.x?.label,
             setBrushScale: (side, scale, dimension) => this.setBrushScale(side, scale, dimension),
             value: (row, index = 0) => valueAtPath(row, fields[index]),
@@ -702,7 +750,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
             },
             hasFormat: index => this.tickFormatSpecifier(index) != null,
             tickCount: (top, values, count) => (top < count && values.every(Number.isInteger) ? Math.max(1, Math.ceil(top)) : count),
-            legend: (keys, color, direction) => drawLegend(d3.select(groupNode), keys, color, direction, width),
+            legend: (keys, color, direction) => {
+                const layer = clipId ? svg.append('g').attr('transform', group.attr('transform')) : group;
+                drawLegend(d3.select(layer.node()!), keys, color, direction, width);
+            },
             partRange: !reducer ? undefined
                 : reducer === 'count' || reducer === 'sum' ? { additive: true }
                 : { additive: false, extent: this.contributionExtent() },
@@ -788,7 +839,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .style('fill', 'white').style('opacity', 0);
         this.configureSignalListeners();
 
-        this.drawingViolations = this.checkDrawing();
+        this.drawingViolations = this.checkDrawing(omitted);
         if (enforcing && this.drawingViolations.length > 0) {
             const shown = this.drawingViolations.slice(0, 3).map(v => `(${v.invariant}) ${v.message}`).join('; ');
             throw new Error(`Plot "${this.definition.name}": the drawing breaks its contract: ${shown.replace(/\.?$/, '.')}`);
@@ -950,6 +1001,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
     /** Margins of the configuration: each render starts from them. */
     private _configuredMargins: PlotMargins | undefined;
     private readonly _ticks: PlotConfig['ticks'];
+    private readonly _scales: PlotConfig['scales'];
     private readonly _brushAxes = new Map<string, (range: [number, number]) => BrushAxisExtent | undefined>();
 
     private setBrushScale<Domain extends d3.AxisDomain>(side: 'x' | 'y', scale: d3.AxisScale<Domain>, dimension?: string): void {
@@ -1358,12 +1410,13 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * Checks the annotations of the current drawing against the contract.
      *
      * 1. Every mark binds a rendered row. 2. Every rendered row produced by features has a mark,
-     * or is drawn as context (`autkContext`, e.g. a treemap group frame). 3. Marks are inside the
+     * is drawn as context (`autkContext`, e.g. a treemap group frame), or is outside a configured
+     * categorical display domain. 3. Marks are inside the
      * marks group (or the HTML container). 4. Marks are SVG shapes with a box, or HTML elements
      * (click only). 5. The highlight annotations are valid (`data-autk-highlight`). (6, the
      * segregated view on a test selection, is run by `checkPlot`.)
      */
-    private checkDrawing(): ContractViolation[] {
+    private checkDrawing(omitted: ReadonlySet<AutkDatum>): ContractViolation[] {
         const violations: ContractViolation[] = [];
         this.drawingTruncated = false;
         const report = (invariant: number, message: string) => {
@@ -1412,7 +1465,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this._data.forEach((row, index) => {
             // A row produced by no feature (a zero density) has nothing to select or highlight.
             const empty = Array.isArray(row.autkIds) && row.autkIds.length === 0;
-            if (!marked.has(row) && !context.has(row) && !empty) {
+            if (!marked.has(row) && !context.has(row) && !empty && !omitted.has(row)) {
                 report(2, `row ${index} (${this.rowIdOf(row) ?? '?'}) has no mark: it can be neither selected nor highlighted `
                     + '(draw it as autkMark, or as autkContext if it is only context)');
             }

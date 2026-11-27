@@ -40,13 +40,18 @@ export const boxplot: PlotDefinition = {
     requiresTransform: true,
     topK: false,
 
-    draw({ group, rows, width, height, axisX, axisY, format }) {
-        const boxes = rows.map(statsOf);
-        const values = boxes.flatMap(r => [r.whiskerLow, r.whiskerHigh, ...r.outliers]);
+    draw({ group, rows, width, height, axisX, axisY, format, scaleDomain, visibleRows }) {
+        const xDomain = scaleDomain?.('x', 'categorical');
+        const yDomain = scaleDomain?.('y', 'numeric');
+        const allBoxes = rows.map(statsOf);
+        const values = allBoxes.flatMap(r => [r.whiskerLow, r.whiskerHigh, ...r.outliers]);
         const [lo, hi] = d3.extent(values) as [number | undefined, number | undefined];
         const pad = ((hi ?? 1) - (lo ?? 0)) * 0.05 || 1;
-        const x = d3.scaleBand(boxes.map(r => r.category), [0, width]).padding(0.35);
-        const y = d3.scaleLinear([(lo ?? 0) - pad, (hi ?? 1) + pad], [height, 0]).nice();
+        const x = d3.scaleBand(xDomain ?? allBoxes.map(r => r.category), [0, width]).padding(0.35);
+        const shown = xDomain ? visibleRows?.(row => x(statsOf(row).category) !== undefined) ?? rows : rows;
+        const boxes = shown.map(statsOf);
+        const y = d3.scaleLinear(yDomain ?? [(lo ?? 0) - pad, (hi ?? 1) + pad], [height, 0]);
+        if (!yDomain) y.nice();
         const band = x.bandwidth();
         const center = (r: BoxStatsRow) => (x(r.category) ?? 0) + band / 2;
 
@@ -72,7 +77,7 @@ export const boxplot: PlotDefinition = {
             .style('stroke', '#57606a');
 
         group.selectAll('rect.autkMark')
-            .data(rows)
+            .data(shown)
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', row => x(statsOf(row).category) ?? 0)

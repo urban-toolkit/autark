@@ -47,15 +47,16 @@ export const densitychart: PlotDefinition = {
         return row => shade(pointOf(row).group);
     },
 
-    draw({ group, rows, width, height, axisX, axisY, format }) {
+    draw({ group, rows, width, height, axisX, axisY, format, scaleDomain }) {
         const { groups, shade } = groupShades(rows);
         const [lo, hi] = d3.extent(rows, row => pointOf(row).x) as [number | undefined, number | undefined];
-        const x = d3.scaleLinear([lo ?? 0, hi ?? 1], [0, width]);
-        const y = d3.scaleLinear([0, (d3.max(rows, row => pointOf(row).value) || 1) * 1.05], [height, 0]);
+        const yDomain = scaleDomain?.('y', 'numeric');
+        const x = d3.scaleLinear(scaleDomain?.('x', 'numeric') ?? [lo ?? 0, hi ?? 1], [0, width]);
+        const y = d3.scaleLinear(yDomain ?? [0, (d3.max(rows, row => pointOf(row).value) || 1) * 1.05], [height, 0]);
 
         axisX(d3.axisBottom(x).ticks(6).tickFormat(format(0, '~s')));
-        // Densities are relative: the y axis shows no numbers.
-        const yAxis = axisY(d3.axisLeft(y).ticks(0).tickSizeOuter(0));
+        // Automatic densities are relative; show numbers when the caller sets the scale.
+        const yAxis = axisY(d3.axisLeft(y).ticks(yDomain ? 5 : 0).tickFormat(format(1)).tickSizeOuter(0));
         if (!yAxis.select('.axis-label').text()) yAxis.select('.axis-label').text('density');
 
         // One curve per group, filled down to 0.

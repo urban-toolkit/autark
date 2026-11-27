@@ -47,6 +47,14 @@ describe('Brush extent', () => {
         expect(move(null)).toMatchObject({ selection: [], extent: null });
     });
 
+    it('reports data extents and selects marks from the same manual domains', () => {
+        const { move } = brush({ type: 'scatterplot', attributes: { axis: ['x', 'y'] },
+            scales: { x: { domain: [0, 20] }, y: { domain: [0, 100] } } }, PlotEvent.BRUSH);
+        expect(move([[0, 0], [90, 260]])).toMatchObject({ selection: [0, 1], extent: { data: {
+            x: { kind: 'numeric', range: [0, 6] }, y: { kind: 'numeric', range: [0, 100] },
+        } } });
+    });
+
     it('reports raw overlapping bar bands, including an empty range in a gap', () => {
         const { div, move } = brush({ type: 'barchart', attributes: { axis: ['category', 'y'] },
             ticks: { x: { label: key => key.toUpperCase() } } }, PlotEvent.BRUSH_X);

@@ -29,10 +29,10 @@ import type { PlotDefinition } from './registered';
  * Closed path of a pointy-top hexagon, with line commands only, so brushes
  * and the segregated view can measure it.
  */
-function hexagonPath(r: number, cx: number, cy: number): string {
+function hexagonPath(r: number, cx: number, cy: number, xPixel: (px: number) => number, yPixel: (px: number) => number): string {
     const corners = d3.range(6).map(k => {
         const angle = Math.PI / 6 + (k * Math.PI) / 3;
-        return `${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`;
+        return `${xPixel(cx + r * Math.cos(angle)).toFixed(2)},${yPixel(cy + r * Math.sin(angle)).toFixed(2)}`;
     });
     return `M${corners.join('L')}Z`;
 }
@@ -50,12 +50,21 @@ export const hexbin: PlotDefinition = {
     colorDomain: PlotStyle.softSequentialDomain,
     highlight: { shape: { mode: 'custom', preset: 'glyph' } },
 
-    draw({ group, rows, width, height, transform, format, axisX, axisY }) {
+    draw({ group, rows, width, height, transform, format, axisX, axisY, scaleDomain }) {
         const grid = shapeOutput(transform, 'binning-hex')
             ?? { extent: { x: [0, 1] as [number, number], y: [0, 1] as [number, number] }, radius: 14 };
-        // Axes over the extent the transform mapped to pixels, inset by the radius.
-        const x = d3.scaleLinear(grid.extent.x, [grid.radius, width - grid.radius]);
-        const y = d3.scaleLinear(grid.extent.y, [height - grid.radius, grid.radius]);
+        const xDomain = scaleDomain?.('x', 'numeric');
+        const yDomain = scaleDomain?.('y', 'numeric');
+        const x = d3.scaleLinear(xDomain ?? grid.extent.x, [grid.radius, width - grid.radius]);
+        const y = d3.scaleLinear(yDomain ?? grid.extent.y, [height - grid.radius, grid.radius]);
+        // Reproject the original bin vertices, not the source points. The binning transform
+        // divides by 1 for a constant column; use the same span when undoing its pixel mapping.
+        const sourceX = d3.scaleLinear([grid.extent.x[0], grid.extent.x[1] === grid.extent.x[0]
+            ? grid.extent.x[0] + 1 : grid.extent.x[1]], x.range());
+        const sourceY = d3.scaleLinear([grid.extent.y[0], grid.extent.y[1] === grid.extent.y[0]
+            ? grid.extent.y[0] + 1 : grid.extent.y[1]], y.range());
+        const xPixel = xDomain ? (px: number) => x(sourceX.invert(px)) : (px: number) => px;
+        const yPixel = yDomain ? (px: number) => y(sourceY.invert(px)) : (px: number) => px;
         axisX(d3.axisBottom(x).ticks(6).tickFormat(format(0, '~s')));
         axisY(d3.axisLeft(y).ticks(5).tickFormat(format(1, '~s')));
 
@@ -63,7 +72,7 @@ export const hexbin: PlotDefinition = {
             .data(rows as BinningHexRow[])
             .join('path')
             .attr('class', 'autkMark')
-            .attr('d', row => hexagonPath(grid.radius, row.cx, row.cy))
+            .attr('d', row => hexagonPath(grid.radius, row.cx, row.cy, xPixel, yPixel))
             .style('stroke', '#ffffff')
             .style('stroke-width', 0.75)
             .selectAll('title').data(row => [row]).join('title')

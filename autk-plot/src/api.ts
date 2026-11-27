@@ -100,6 +100,15 @@ export type PlotConfig = {
         /** D3 tick formats keyed by field name for parallel coordinates. */
         dimensions?: Record<string, { format?: string }>;
     };
+    /** Optional display domains. Omitted channels keep the plot's automatic scales. */
+    scales?: {
+        x?: { domain: PlotScaleDomain };
+        y?: { domain: PlotScaleDomain };
+        /** Numeric domain for bubble sizes. */
+        size?: { domain: NumericPlotDomain };
+        /** Axis domains keyed by field name for parallel coordinates. */
+        dimensions?: Record<string, { domain: PlotScaleDomain }>;
+    };
     /** Appearance overrides for this plot. */
     style?: {
         /** Fixed scatterplot point radius in pixels; defaults to 5. */
@@ -125,6 +134,12 @@ export type PlotConfig = {
      */
     topK?: TopKConfig;
 };
+
+/** Finite, increasing bounds for a continuous plot scale. */
+export type NumericPlotDomain = readonly [min: number, max: number];
+
+/** Numeric bounds or an ordered list of unique category keys. */
+export type PlotScaleDomain = NumericPlotDomain | readonly string[];
 
 /**
  * A condition on a source feature property, used by `PlotConfig.filter`.

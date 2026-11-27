@@ -49,41 +49,45 @@ function seriesLabels(config: PlotConfig): Partial<PlotConfig> {
 
 /** Draws the points and the line, and under them the area when `filled`. */
 function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
-    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange, xTickLabel } = context;
+    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange, xTickLabel, scaleDomain, visibleRows } = context;
     const bucket = (row: AutkDatum) => String(value(row, 0));
     const amount = (row: AutkDatum) => Number(value(row, 1));
-    const rows = context.rows.slice().sort((a, b) => compareBuckets(bucket(a), bucket(b)));
-    const index = new Map(rows.map((row, i) => [row, i]));
+    const xDomain = scaleDomain?.('x', 'categorical');
+    const yDomain = scaleDomain?.('y', 'numeric');
+    const order = new Map(xDomain?.map((key, i) => [key, i]));
+    const rows = (xDomain ? visibleRows?.(row => order.has(bucket(row))) ?? context.rows : context.rows).slice()
+        .sort((a, b) => xDomain ? order.get(bucket(a))! - order.get(bucket(b))! : compareBuckets(bucket(a), bucket(b)));
+    const index = new Map(rows.map((row, i) => [row, xDomain ? order.get(bucket(row))! : i]));
     const positionOf = (row: AutkDatum) => index.get(row)!;
     // A bucket is written as it is ("2020"), or with the x format the configuration gives, when it reads as a number.
-    const label = (row: AutkDatum) => {
-        const n = Number(bucket(row));
-        return hasFormat(0) && Number.isFinite(n) && String(n) === bucket(row) ? format(0)(n) : bucket(row);
+    const label = (key: string) => {
+        const n = Number(key);
+        return hasFormat(0) && Number.isFinite(n) && String(n) === key ? format(0)(n) : key;
     };
 
     // Parts lie between 0 and their bucket (count, sum), or anywhere in the reduced values (avg, min, max).
-    const values = rows.map(amount);
+    const values = context.rows.map(amount);
     if (partRange) values.push(...(partRange.additive ? [0] : partRange.extent));
     const [low, high] = values.length > 0 ? [Math.min(...values), Math.max(...values)] : [0, 50];
     const pad = (high - low) * 0.1 || 1;
-    const x = d3.scaleLinear([0, Math.max(rows.length, 1) - 1], [0, width]);
-    const y = d3.scaleLinear([partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
+    const keys = xDomain ?? rows.map(bucket);
+    const x = d3.scaleLinear([0, Math.max(keys.length, 1) - 1], [0, width]);
+    const y = d3.scaleLinear(yDomain ?? [partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
 
     // Format labels without changing bucket keys or point positions.
-    const keys = rows.map(bucket);
     const times = xTickLabel ? [] : keys.map(key => /^\d{4}-\d{2}-\d{2}(?:[T ]|$)/.test(key) ? bucketTime(key) : NaN);
     const isTemporal = times.length > 0 && times.every(Number.isFinite);
-    const shortSpan = isTemporal && times[times.length - 1] - times[0] <= 4 * 86_400_000;
+    const shortSpan = isTemporal && d3.max(times)! - d3.min(times)! <= 4 * 86_400_000;
     const dateLabel = d3.utcFormat('%b %-d');
     const hourLabel = d3.utcFormat('%b %-d %Hh');
     const labels = keys.map((key, i) => {
         if (xTickLabel) return xTickLabel(key);
-        if (!isTemporal) return label(rows[i]);
+        if (!isTemporal) return label(key);
         return (shortSpan && key.length > 10 ? hourLabel : dateLabel)(new Date(times[i]));
     });
     // Custom labels choose positions explicitly; otherwise sample only real bucket ranks.
-    const buckets = xTickLabel ? keys.map((_, i) => i).filter(i => labels[i] !== '')
-        : x.ticks(Math.min(Math.max(rows.length, 1), 12)).filter(Number.isInteger);
+    const buckets = xTickLabel || xDomain ? keys.map((_, i) => i).filter(i => labels[i] !== '')
+        : x.ticks(Math.min(Math.max(keys.length, 1), 12)).filter(Number.isInteger);
     axisX(d3.axisBottom(x).tickValues(buckets).tickFormat(i => labels[+i] ?? String(i)))
         .selectAll('.tick text')
         .style('font-size', '11px')
@@ -97,14 +101,12 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
 
     const series: PlotSeries[] = [];
     if (filled) {
-        // The area reaches 0, or the bottom of the plot when 0 is below the axis.
-        const clamped = y.copy().clamp(true);
-        const [bottom, top] = y.domain();
-        const base = clamped(Math.min(Math.max(0, bottom), top));
+        // Manual domains clip the path at the plot boundary instead of moving its vertices.
+        const areaY = yDomain ? y : y.copy().clamp(true);
         const areaOf = (v: (row: AutkDatum) => number | null) => d3.area<AutkDatum>()
             .x(row => x(positionOf(row)))
-            .y0(base)
-            .y1(row => clamped(v(row) ?? 0))(rows);
+            .y0(areaY(0))
+            .y1(row => areaY(v(row) ?? 0))(rows);
         const area = group.append('path')
             .datum(rows)
             .attr('class', 'autk-area')
@@ -141,7 +143,7 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
         .attr('cy', row => y(amount(row)))
         .attr('r', 5)
         .append('title')
-        .text(row => `${label(row)}: ${d3.format('~s')(amount(row))}`);
+        .text(row => `${label(bucket(row))}: ${d3.format('~s')(amount(row))}`);
 
     group.selectAll('text.autk-empty')
         .data(rows.length === 0 ? ['No series data available'] : [])

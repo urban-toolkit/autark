@@ -38,11 +38,14 @@ export const heatmatrix: PlotDefinition = {
     // Cells have one size: the value is in the color, never in the geometry.
     highlight: { rect: { mode: 'custom', preset: 'glyph' } },
 
-    draw({ group, rows, width, height, value, axisX, axisY }) {
+    draw({ group, rows, width, height, value, axisX, axisY, scaleDomain, visibleRows }) {
         const xLabel = (row: AutkDatum) => String(value(row, 0));
         const yLabel = (row: AutkDatum) => String(value(row, 1));
-        const x = d3.scaleBand(ordered(rows, xLabel, row => Number(row.xOrder)), [0, width]).padding(0.05);
-        const y = d3.scaleBand(ordered(rows, yLabel, row => Number(row.yOrder)), [0, height]).padding(0.05);
+        const xDomain = scaleDomain?.('x', 'categorical');
+        const yDomain = scaleDomain?.('y', 'categorical');
+        const x = d3.scaleBand(xDomain ?? ordered(rows, xLabel, row => Number(row.xOrder)), [0, width]).padding(0.05);
+        const y = d3.scaleBand(yDomain ?? ordered(rows, yLabel, row => Number(row.yOrder)), [0, height]).padding(0.05);
+        const shown = xDomain || yDomain ? visibleRows?.(row => x(xLabel(row)) !== undefined && y(yLabel(row)) !== undefined) ?? rows : rows;
 
         axisX(d3.axisBottom(x).tickSizeOuter(0))
             .selectAll('.tick text')
@@ -53,7 +56,7 @@ export const heatmatrix: PlotDefinition = {
         axisY(d3.axisLeft(y).tickSizeOuter(0));
 
         group.selectAll('rect.autkMark')
-            .data(rows)
+            .data(shown)
             .join('rect')
             .attr('class', 'autkMark')
             .attr('x', row => x(xLabel(row)) ?? 0)

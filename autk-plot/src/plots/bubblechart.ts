@@ -34,11 +34,12 @@ export const bubblechart: PlotDefinition = {
     },
 
     draw(context) {
-        const { group, rows, value } = context;
+        const { group, rows, value, scaleDomain } = context;
         const [x, y] = gridAxes(context);
 
         const sizes = rows.map(row => Number(value(row, 2))).filter(v => Number.isFinite(v) && v >= 0);
-        const size = d3.scaleSqrt([0, d3.max(sizes) || 1], RADIUS_RANGE);
+        const sizeDomain = scaleDomain?.('size', 'numeric');
+        const size = d3.scaleSqrt(sizeDomain ?? [0, d3.max(sizes) || 1], RADIUS_RANGE).clamp(sizeDomain !== undefined);
         const radius = (row: AutkDatum) => {
             const v = Number(value(row, 2));
             return Number.isFinite(v) && v >= 0 ? size(v) : RADIUS_RANGE[0];

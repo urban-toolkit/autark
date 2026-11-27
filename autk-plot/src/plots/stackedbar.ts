@@ -51,18 +51,27 @@ export const stackedbar: PlotDefinition = {
     },
     highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
-    draw({ group, rows, width, height, axisX, axisY, format, tickCount, legend }) {
+    draw({ group, rows, width, height, axisX, axisY, format, tickCount, legend, scaleDomain, visibleRows }) {
         const groups = rows.filter(row => nodeOf(row).level === 0);
-        const leaves = rows.filter(row => nodeOf(row).level === 1);
         const { subgroups, shade } = subgroupShades(rows);
-        const x = d3.scaleBand(groups.map(row => nodeOf(row).label), [0, width]).padding(0.2);
-        const y = d3.scaleLinear([0, Math.max(1, d3.max(groups, row => nodeOf(row).value) ?? 0)], [height, 0]).nice();
+        const xDomain = scaleDomain?.('x', 'categorical');
+        const yDomain = scaleDomain?.('y', 'numeric');
+        const x = d3.scaleBand(xDomain ?? groups.map(row => nodeOf(row).label), [0, width]).padding(0.2);
+        const y = d3.scaleLinear(yDomain ?? [0, Math.max(1, d3.max(groups, row => nodeOf(row).value) ?? 0)], [height, 0]);
+        if (!yDomain) y.nice();
+        const shownGroups = xDomain ? groups.filter(row => x(nodeOf(row).label) !== undefined) : groups;
+        const keys = new Set(shownGroups.map(row => nodeOf(row).key));
+        const shown = xDomain ? visibleRows?.(row => {
+            const node = nodeOf(row);
+            return node.level === 0 ? keys.has(node.key) : keys.has(node.parent!);
+        }) ?? rows : rows;
+        const leaves = shown.filter(row => nodeOf(row).level === 1);
 
         // Each group is drawn as its category on the x axis.
-        const groupOf = new Map(groups.map(row => [nodeOf(row).label, row]));
-        const rotate = groups.length > 6;
+        const groupOf = new Map(shownGroups.map(row => [nodeOf(row).label, row]));
+        const rotate = x.domain().length > 6;
         const ticks = axisX(d3.axisBottom(x).tickSizeOuter(0)).selectAll<SVGGElement, string>('.tick');
-        ticks.datum(label => groupOf.get(label)!).classed('autkContext', true);
+        ticks.filter(label => groupOf.has(label)).datum(label => groupOf.get(label)!).classed('autkContext', true);
         ticks.select('text')
             .style('text-anchor', rotate ? 'end' : 'middle')
             .attr('dx', rotate ? '-0.6em' : null)
@@ -77,7 +86,7 @@ export const stackedbar: PlotDefinition = {
         // Segments stacked from the base, in legend order.
         const boxes = new Map<AutkDatum, { x: number; y: number; height: number }>();
         const box = (row: AutkDatum) => boxes.get(row)!;
-        for (const bar of groups) {
+        for (const bar of shownGroups) {
             let base = 0;
             const segments = leaves.filter(row => nodeOf(row).parent === nodeOf(bar).key)
                 .sort((a, b) => subgroups.indexOf(nodeOf(a).label) - subgroups.indexOf(nodeOf(b).label));
