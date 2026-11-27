@@ -58,6 +58,7 @@ plot.setSelection([0, 4, 10]);
 * `selection`: Returns selected source feature ids.
 * `events`: Typed event bus for click, brush, and other supported plot events.
 * `setSelection(selection, shares?)`: Applies a selection by source feature ids, optionally with the share of each feature covered in the emitting view.
+* `setAnnotations(list)`: Replaces reference marks without redrawing the data. Pass `[]` to clear them.
 * `updateCollection(collection)`: Replaces the source GeoJSON collection and redraws.
 * `draw()`: Redraws the plot synchronously.
 * `provenance`: Provenance graph of the current draw, from source features to marks.
@@ -69,6 +70,77 @@ Besides the attributes, labels and styling options, the config accepts:
 * `filter`: Keeps only the features that meet one or more conditions (`==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `not-in`).
 * `topK`: Keeps the `k` largest rows, optionally gathering the rest in an "Others" row.
 * `provenance: { path: true }`: Shows, under the plot, how many entities the selection reaches at each stage. Off by default.
+
+### Series and fixed reference marks
+
+Scatter, bubble, and bar charts can group one collection on shared scales. Set `attributes.series` to a property with nonempty string keys. Groups use categorical colors and a legend; filtering does not change the colors or move bar slots for the remaining groups. In series mode, use a categorical `style.colorMap` if you want to override colors. An explicit color domain must include all source series keys and sets color order independently of slot order. Do not combine series with `attributes.color` or `topK`. Transforms are supported in series mode only for the line chart's `reduce-series` preset.
+
+To assign colors to specific keys, import `ColorMapDomainStrategy` from `@urban-toolkit/autk-core` and add this to your plot configuration:
+
+```ts
+style: {
+    colorMap: {
+        type: 'categorical',
+        colors: ['#087e78', '#875194'],
+        domainSpec: { type: ColorMapDomainStrategy.USER, params: ['Before', 'After'] },
+    },
+},
+```
+
+`Before` is teal and `After` is plum, regardless of which appears first in the collection. The legend uses the same colors.
+
+```ts
+const plot = new AutkPlot(container, {
+    type: 'barchart',
+    collection,
+    attributes: { axis: ['district', 'trips'], series: 'period' },
+});
+plot.setAnnotations([
+    { id: 'target-range', type: 'band', y: [110, 135], label: 'Target range' },
+    { id: 'district', type: 'line', x: 'South' },
+]);
+```
+
+Grouped bars require one finite, nonnegative number per `(category, series)` pair. Missing pairs leave empty slots; duplicate pairs raise an error. Series mode does not change source feature IDs or selection events.
+
+Fixed annotations are available on scatter, bubble, bar, and line charts. A line takes one coordinate (`x` or `y`), a point takes both, and a band takes a two-value interval on one axis. Use numbers on numeric axes and unformatted keys on categorical axes. Each annotation has a unique nonempty `id` and may specify a `label` or CSS `color`. Annotations do not affect selection, automatic domains, or provenance. A reference outside the view is hidden or clipped; an invalid replacement leaves the previous list installed.
+
+Registered Cartesian plots can opt in through `series: true` or `annotations: 'reference'` on their definition. In series mode, `draw` gets `seriesGroups` with `{ key, color, rows }` entries, including empty groups, and `color(row)` uses the series encoding. Bind the original draw-context rows to marks. Use `visibleRows` when a categorical domain omits rows so the series legend can omit those groups too. The annotation preset uses the scales passed to `axisX` and `axisY`; call `setAnnotationAxis?.(side, mapping)` to supply plot-local positions explicitly when the ticks do not use the same coordinates as the marks. Categorical bands on explicit mappings also require category bounds.
+
+### Grouped line charts
+
+Set `attributes.series` and `transform: { preset: 'reduce-series' }` to reduce the observations in each series independently and draw one path per group. The groups share the union of observed bucket keys in line-chart order. Set `scales.x.domain` to specify the exact bucket order or reserve buckets missing from every series. A missing bucket breaks the affected path and its linked highlight; it does not count as a row or a zero. Clicks and brushes on the bucket points still report original feature IDs.
+
+```ts
+const lines = new AutkPlot(container, {
+    type: 'linechart',
+    collection,
+    attributes: { axis: ['monthly'], series: 'scenario' },
+    transform: { preset: 'reduce-series', options: { reducer: 'avg' } },
+});
+lines.setAnnotations([
+    { id: 'review-month', type: 'line', x: '2025-02' },
+    { id: 'proposal', type: 'point', series: 'Proposal', x: '2025-02', label: 'Proposal' },
+]);
+```
+
+For a series-point callout, omit `y` and use the raw bucket key, not a tick label. The callout follows the transformed point and defaults to the series color. If that point is missing or outside the display window, the callout stays installed but hidden.
+
+### Statistical annotations
+
+Use `'min'`, `'max'`, or `'mean'` in place of a numeric line or point coordinate. Scatter and bubble support statistics on both axes; bar and line charts support them on Y only. On a categorical or bucket axis, `'mean'` is still a literal key. Band endpoints remain fixed coordinates.
+
+```ts
+scatter.setAnnotations([
+    { id: 'average', type: 'line', y: 'mean' },
+    { id: 'centroid', type: 'point', x: 'mean', y: 'mean' },
+    { id: 'trend', type: 'line', fit: 'linear' },
+]);
+```
+
+Statistics pool finite observations across series after filtering and transforms, before manual display windows. A single coordinate uses all finite observations on that axis. The centroid and least-squares fit use complete X/Y pairs only. The fit stops at the observed X extent and is hidden when fewer than two pairs are available or all paired X values are equal. The line chart's Y mean uses the transformed bucket values, not the observations inside each bucket.
+
+Registered plots can call `setAnnotationObservations?.({ axes: ['x', 'y'], rows })` to opt in to statistics. Each observation is a record with optional numeric `x` and `y` coordinates; omit missing values. Declare supported axes even when there are no observations. Providing an axis scale alone does not opt in to statistics.
 
 ### Numeric axis ticks
 

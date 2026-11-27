@@ -85,6 +85,8 @@ export type PlotConfig = {
         axis?: string[];
         /** Property name mapped to the color channel. */
         color?: string;
+        /** Source feature property grouping rows on shared scales. Mutually exclusive with color. */
+        series?: string;
     };
     /** Name of a plot registered with `registerPlot`, used with `type: 'registered'`. */
     plot?: string;

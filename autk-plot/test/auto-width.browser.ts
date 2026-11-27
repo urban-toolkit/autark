@@ -81,6 +81,20 @@ describe("width: 'auto'", () => {
         expect(svgWidth()).toBe('480px');
     });
 
+    test('repositions annotations using the resized mark coordinates', () => {
+        const div = document.createElement('div');
+        document.body.append(div);
+        setHostWidth(div, 400);
+        const plot = new autkPlot.AutkPlot(div, { type: 'scatterplot', collection: regions(), width: 'auto',
+            attributes: { axis: ['shape_area', 'shape_leng'] }, scales: { x: { domain: [0, 100] } } });
+        plot.setAnnotations([{ id: 'reference', type: 'line', x: 50 }]);
+        const guideX = () => Number(div.querySelector('[data-annotation-id="reference"] line')?.getAttribute('x1'));
+        const before = guideX();
+        expect(before).toBeGreaterThan(0);
+        resize(div, 600);
+        expect(guideX() - before).toBeCloseTo(100);
+    });
+
     test('falls back to 800 while the host has no layout', () => {
         // A hidden host has no layout, in a browser as in jsdom.
         const hidden = document.createElement('div');

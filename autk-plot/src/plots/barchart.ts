@@ -25,6 +25,8 @@ import type { PlotDefinition } from './registered';
 export const barchart: PlotDefinition = {
     name: 'barchart',
     label: 'Barchart',
+    annotations: 'reference',
+    series: true,
     // A registered transform is read like binning-1d when it yields label and value rows.
     transforms: ['binning-1d', 'category-value'],
     defaults: config => ({
@@ -39,9 +41,27 @@ export const barchart: PlotDefinition = {
     // even when there are too few bars for the geometry to prove it.
     highlight: { rect: { mode: 'subset', channel: 'length', axis: 'y', anchor: 'end' } },
 
-    draw({ group, rows, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount, style, xTickLabel, scaleDomain, visibleRows }) {
+    draw({ group, rows, seriesGroups, value, width, height, format, hasFormat, axisX, axisY, partRange, tickCount, style, xTickLabel, scaleDomain, visibleRows, setAnnotationObservations }) {
         const label = (row: AutkDatum) => String(value(row, 0));
         const amount = (row: AutkDatum) => Number(value(row, 1)) || 0;
+        setAnnotationObservations?.({ axes: ['y'], rows: rows.map(row => {
+            const raw = value(row, 1);
+            return { y: typeof raw === 'number' || (typeof raw === 'string' && raw.trim()) ? Number(raw) : undefined };
+        }) });
+        const slots = new Map<AutkDatum, number>();
+        seriesGroups?.forEach(({ key, rows: members }, slot) => {
+            const categories = new Set<string>();
+            for (const row of members) {
+                const category = label(row);
+                const raw = value(row, 1);
+                if (categories.has(category)) throw new Error(`Barchart: duplicate bar for category "${category}", series "${key}".`);
+                if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
+                    throw new Error(`Barchart: category "${category}", series "${key}" requires a finite nonnegative amount.`);
+                }
+                categories.add(category);
+                slots.set(row, slot);
+            }
+        });
 
         const padding = style?.barPadding ?? 0.25;
         const xDomain = scaleDomain?.('x', 'categorical');
@@ -87,12 +107,13 @@ export const barchart: PlotDefinition = {
         // A few counts get whole ticks, never "500m" of a feature.
         axisY(d3.axisLeft(y).ticks(tickCount(y.domain()[1], rows.map(amount), 10)).tickSizeInner(-width).tickFormat(format(1)));
 
+        const barWidth = x.bandwidth() / Math.max(1, seriesGroups?.length ?? 1);
         group.selectAll('rect.autkMark')
             .data(shown)
             .join('rect')
             .attr('class', 'autkMark')
-            .attr('x', row => x(label(row)) ?? 0)
-            .attr('width', x.bandwidth())
+            .attr('x', row => (x(label(row)) ?? 0) + barWidth * (slots.get(row) ?? 0))
+            .attr('width', barWidth)
             .attr('y', row => yDomain ? Math.min(baseline, y(amount(row))) : y(amount(row)))
             .attr('height', row => yDomain ? Math.abs(baseline - y(amount(row))) : height - y(amount(row)))
             .style('stroke', '#2f2f2f')

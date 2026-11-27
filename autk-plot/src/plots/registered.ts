@@ -27,6 +27,12 @@ import { PlotBaseInteractive } from '../plot-base-interactive';
 import type { SegregatedPart } from '../plot-base-interactive';
 import { PlotStyle } from '../plot-style';
 import { defaultTickFormat } from '../number-format';
+import { annotationAxis, paintAnnotations, validateAnnotations } from '../annotations';
+import type { PlotAnnotation, PlotAnnotationAxis, PlotAnnotationSeriesPoint } from '../annotations';
+import type { PlotAnnotationObservations } from '../annotation-statistics';
+import { runGroupedReduceSeries } from '../transforms/grouped-reduce-series';
+import { resolveSeries } from '../series';
+import type { PlotSeriesGroup } from '../series';
 import { featureId } from '../provenance';
 import { PlotEvent } from '../types-events';
 import type { BrushAxisExtent, BrushExtent } from '../types-events';
@@ -72,10 +78,18 @@ export type PlotDrawContext = {
     visibleRows?: (includes: (row: AutkDatum) => boolean) => AutkDatum[];
     /** Optional custom label for a category or bucket on the X axis. */
     xTickLabel?: (key: string) => string;
+    /** Overrides the annotation mapping inferred from a standard axis. */
+    setAnnotationAxis?: (side: 'x' | 'y', axis: PlotAnnotationAxis) => void;
+    /** Publishes a lookup for series-point annotations, including when there are no matching marks. */
+    setAnnotationSeriesPoint?: (lookup: PlotAnnotationSeriesPoint) => void;
+    /** Declares observations after transforms but before manual display windows. */
+    setAnnotationObservations?: (observations: PlotAnnotationObservations) => void;
     /** Supplies a brush scale for an axis drawn manually or positioned by bucket rank. */
     setBrushScale?: <Domain extends d3.AxisDomain>(side: 'x' | 'y', scale: d3.AxisScale<Domain>, dimension?: string) => void;
     /** Value of a row on axis `index` (default 0). */
     value: (row: AutkDatum, index?: number) => unknown;
+    /** Input groups in stable source order, including empty groups after filtering. */
+    seriesGroups?: readonly PlotSeriesGroup[];
     /** Current color of a row's mark. */
     color: (row: AutkDatum) => string;
     /** Inner width and height, without margins. */
@@ -214,6 +228,10 @@ export type PlotHighlight =
  * optional and refines the generic behavior.
  */
 export type PlotDefinition = {
+    /** Opts in to page-supplied reference annotations on positional axes. */
+    annotations?: 'reference';
+    /** Opts in to grouped input on shared scales. */
+    series?: true;
     /** Name used in `{ type: 'registered', plot: name }` (the `type` itself for a built-in plot). */
     name: string;
     /** Name shown in error messages. Defaults to `name`. */
@@ -481,6 +499,17 @@ function prepareConfig(config: PlotConfig, definition: PlotDefinition): void {
         }
     }
 
+    const series = config.attributes?.series;
+    if (series !== undefined) {
+        if (typeof series !== 'string' || !series.trim()) throw new Error('Plot attributes.series requires a nonempty field name.');
+        if (!definition.series) throw new Error(`${label} does not support attributes.series.`);
+        if (config.attributes?.color !== undefined) throw new Error('Plot attributes.series cannot be combined with attributes.color.');
+        if (definition.name === 'linechart') {
+            if (config.transform?.preset !== 'reduce-series') throw new Error('Linechart attributes.series requires the reduce-series transform.');
+        } else if (config.transform) throw new Error('Plot attributes.series does not support transforms.');
+        if (config.topK) throw new Error('Plot attributes.series does not support topK.');
+    }
+
     const transform = config.transform;
     const accepted = definition.transforms ?? [];
     // Accepted names that are transforms; the others are row shapes only (e.g. `category-value`).
@@ -561,6 +590,23 @@ export class RegisteredPlot extends PlotBaseInteractive {
     private _moved: Element[] = [];
     /** Base color of the marks of the current drawing (`baseColor`). */
     private _baseColor: ((row: AutkDatum) => string) | undefined;
+    private readonly _seriesField?: string;
+    private _inputSeries?: ReturnType<typeof resolveSeries>;
+    private _annotations: PlotAnnotation[] = [];
+    private _annotationLayout?: {
+        axes: Partial<Record<'x' | 'y', PlotAnnotationAxis>>;
+        seriesPoint?: PlotAnnotationSeriesPoint;
+        observations?: PlotAnnotationObservations;
+        paint: (list: readonly PlotAnnotation[]) => void;
+    };
+
+    /** Replaces page-supplied annotations without redrawing the plot. */
+    setAnnotations(list: readonly PlotAnnotation[]): void {
+        const layout = this._annotationLayout;
+        const annotations = validateAnnotations(list, layout);
+        layout?.paint(annotations);
+        this._annotations = annotations;
+    }
 
     /**
      * Creates the plot and performs the initial draw.
@@ -576,6 +622,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super(config);
         definition.validate?.(config);
         this.definition = definition;
+        this._seriesField = config.attributes?.series;
         this._ticks = config.ticks;
         this._scales = config.scales;
         this._defaultNumericInterpolator = definition.defaultNumericInterpolator ?? this._defaultNumericInterpolator;
@@ -609,14 +656,34 @@ export class RegisteredPlot extends PlotBaseInteractive {
         this._transformConfig = { ...transform, options: { ...configured, ...options(area, configured) } } as PlotTransformConfig;
     }
 
+    /** Runs the built-in series reduction independently on each filtered group. */
+    protected override executeTransform(rows: AutkDatum[], config: PlotTransformConfig, columns: string[]): ExecutedPlotTransform {
+        if (this._seriesField === undefined || config.preset !== 'reduce-series') return super.executeTransform(rows, config, columns);
+        const { groups } = resolveSeries(this._seriesField, this._sourceFeatures, rows, this._style?.colorMap);
+        const { groups: reduced, ...result } = runGroupedReduceSeries(groups, config.options ?? {}, columns);
+        const colorByRow = new WeakMap<AutkDatum, string>();
+        for (const group of reduced) {
+            for (const row of group.rows) colorByRow.set(row, group.color);
+        }
+        this._inputSeries = { groups: reduced, colorByRow };
+        return { ...result, preset: 'reduce-series' };
+    }
+
     /**
      * Keeps the transform result for the drawing context, and refuses a
      * registered transform whose reducer the plot cannot draw.
      */
     protected override resolveTransformResult(result: ExecutedPlotTransform): ResolvedPlotTransform {
         checkReducer(result.provenance.reducer, this.definition);
-        this._transformResult = result;
+        this._transformResult = this._seriesField === undefined ? result : undefined;
         return super.resolveTransformResult(result);
+    }
+
+    protected override afterDataRefresh(): void {
+        super.afterDataRefresh();
+        if (this._seriesField !== undefined && !this._transformConfig) {
+            this._inputSeries = resolveSeries(this._seriesField, this._sourceFeatures, this._data, this._style?.colorMap);
+        }
     }
 
     /** Lets the definition adjust a numeric color domain computed from the data. */
@@ -630,14 +697,19 @@ export class RegisteredPlot extends PlotBaseInteractive {
 
     /** The definition's color field when the configuration sets none (and it was not cleared). */
     protected override get renderColorAttribute(): string | undefined {
+        if (this._seriesField !== undefined) return undefined;
         const own = super.renderColorAttribute;
         if (own !== undefined || this._transformColorAttribute === null) return own;
         return this.definition?.colorAttribute;
     }
 
-    /** Unhighlighted marks without a color attribute take the definition's base color. */
+    /** Restores the series or definition color when a mark is no longer highlighted. */
     protected override getMarkColor(d: unknown): string {
-        if (this._baseColor && !this.isMarkHighlighted(d) && !this.renderColorAttribute) return this._baseColor(d as AutkDatum);
+        if ((this._inputSeries || this._baseColor) && !this.isMarkHighlighted(d)) {
+            const seriesColor = this._inputSeries?.colorByRow.get(d as AutkDatum);
+            if (seriesColor !== undefined) return seriesColor;
+            if (this._baseColor && !this.renderColorAttribute) return this._baseColor(d as AutkDatum);
+        }
         return super.getMarkColor(d);
     }
 
@@ -693,6 +765,14 @@ export class RegisteredPlot extends PlotBaseInteractive {
         if (!svgNode || !groupNode || !htmlNode) throw new Error('SVG element could not be created.');
 
         const fields = this.renderAxisAttributes;
+        const axes = this.definition.annotations === 'reference' ? {} as Partial<Record<'x' | 'y', PlotAnnotationAxis>> : undefined;
+        const explicitAxes: Partial<Record<'x' | 'y', PlotAnnotationAxis>> = {};
+        let annotationSeriesPoint: PlotAnnotationSeriesPoint | undefined;
+        let observations: PlotAnnotationObservations | undefined;
+        const drawAxis = <Domain extends d3.AxisDomain>(side: 'x' | 'y', axis: d3.Axis<Domain>, label?: number | string) => {
+            if (axes) axes[side] = annotationAxis(axis.scale(), side === 'x' ? width : height);
+            return this.drawAxis(svg, side, axis, width, height, label);
+        };
         const reducer = this._provenance.reducer;
         const omitted = new Set<AutkDatum>();
         let hasCategoricalOverride = false;
@@ -727,6 +807,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
             group: d3.select(groupNode),
             html: d3.select(htmlNode),
             rows: this._data,
+            seriesGroups: this._inputSeries?.groups,
             fields,
             interactive: this._enabledEvents.length > 0,
             style: this._style,
@@ -742,8 +823,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
             color: row => this.getMarkColor(row),
             width,
             height,
-            axisX: (axis, label) => this.drawAxis(svg, 'x', axis, width, height, label),
-            axisY: (axis, label) => this.drawAxis(svg, 'y', axis, width, height, label),
+            axisX: (axis, label) => drawAxis('x', axis, label),
+            axisY: (axis, label) => drawAxis('y', axis, label),
+            setAnnotationAxis: axes && ((side, axis) => { explicitAxes[side] = axis; }),
+            setAnnotationSeriesPoint: axes && (lookup => { annotationSeriesPoint = lookup; }),
+            setAnnotationObservations: axes && (declared => { observations = declared; }),
             format: (index, fallback) => {
                 const specifier = this.tickFormatSpecifier(index);
                 return specifier == null ? defaultTickFormat : d3.format(specifier || fallback || '');
@@ -771,6 +855,12 @@ export class RegisteredPlot extends PlotBaseInteractive {
         });
 
         this._series = (drawn ? drawn.series : undefined) ?? [];
+        const legend = this._inputSeries?.groups.filter(series => series.rows.some(row => !omitted.has(row)));
+        if (legend?.length) {
+            const layer = svg.append('g').attr('class', 'autk-series-legend').attr('transform', group.attr('transform'));
+            const colors = new Map(legend.map(series => [series.key, series.color]));
+            drawLegend(d3.select(layer.node()!), [...colors.keys()], key => colors.get(key)!, 'row', width);
+        }
 
         // A drawing made only of HTML (a table) has no SVG: its title is an HTML
         // heading over the marks, and it fills its host, where its content scrolls.
@@ -838,6 +928,28 @@ export class RegisteredPlot extends PlotBaseInteractive {
             .attr('width', width).attr('height', height)
             .style('fill', 'white').style('opacity', 0);
         this.configureSignalListeners();
+
+        if (axes && !this._grownMargins) {
+            Object.assign(axes, explicitAxes);
+            let clear: (() => void) | undefined;
+            const layout = { axes, seriesPoint: annotationSeriesPoint, observations };
+            this._annotationLayout = { ...layout, paint: list => {
+                clear?.();
+                clear = undefined;
+                if (list.length === 0) return;
+                const id = `autk-plot-clip-${++nextPlotClipId}`;
+                const defs = svg.append('defs');
+                defs.append('clipPath').attr('id', id).append('rect').attr('width', width).attr('height', height);
+                const background = svg.insert('g', '.autkMarksGroup').attr('class', 'autk-annotation-background');
+                const foreground = svg.append('g').attr('class', 'autk-annotation-foreground');
+                for (const layer of [background, foreground]) {
+                    layer.attr('transform', group.attr('transform')).attr('clip-path', `url(#${id})`).style('pointer-events', 'none');
+                }
+                clear = () => { defs.remove(); background.remove(); foreground.remove(); };
+                paintAnnotations(list, layout, background, foreground, width, height);
+            } };
+            this._annotationLayout.paint(this._annotations);
+        }
 
         this.drawingViolations = this.checkDrawing(omitted);
         if (enforcing && this.drawingViolations.length > 0) {
@@ -967,7 +1079,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         marks.filter((_d, i, nodes) => !(nodes[i] instanceof SVGElement))
             .style('background-color', d => (this.isMarkHighlighted(d)
                 ? this.highlightColor
-                : this.renderColorAttribute ? this.getMarkColor(d) : 'transparent'))
+                : this._inputSeries || this.renderColorAttribute ? this.getMarkColor(d) : 'transparent'))
             .style('color', d => (this.isMarkHighlighted(d) ? PlotStyle.provenanceText : null));
         const style = this.definition?.markStyle;
         if (style) {
@@ -1222,6 +1334,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
      * @param attribute Row field, or `undefined` to stop coloring by one.
      */
     private colorBy(attribute: string | undefined): void {
+        if (this._inputSeries) return;
         this.setRenderColorAttribute(attribute);
         if (attribute) this.computeColorDomain();
         else this._resolvedDomain = undefined;

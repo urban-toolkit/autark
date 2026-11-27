@@ -6,6 +6,9 @@ export { AutkPlot } from './plot';
 // ─── API and config types ───────────────────────────────────────────────────
 
 export type { AutkDatum } from './types-plot';
+export type { AnnotationCoordinate, PlotAnnotation, PlotAnnotationAxis, PlotAnnotationSeriesPoint } from './annotations';
+export type { AnnotationStatistic, PlotAnnotationObservation, PlotAnnotationObservations } from './annotation-statistics';
+export type { PlotSeriesGroup } from './series';
 
 export type {
 	PlotMargins,

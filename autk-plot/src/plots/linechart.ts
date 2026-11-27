@@ -5,6 +5,7 @@
  * bucket order (dates, numbers, then text), one point each, joined by a line. A selection
  * elsewhere moves each point to the value of the selected subset and redraws the line (and the
  * area, for count and sum); for avg, min, and max a bucket without selected units is a gap.
+ * Grouped lines use one bucket vocabulary and break both paths at missing series buckets.
  *
  * @example
  * new AutkPlot(plotDiv, {
@@ -49,15 +50,18 @@ function seriesLabels(config: PlotConfig): Partial<PlotConfig> {
 
 /** Draws the points and the line, and under them the area when `filled`. */
 function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Partial<Record<MarkKind, HighlightRule>>; series: PlotSeries[] } {
-    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange, xTickLabel, scaleDomain, visibleRows } = context;
+    const { group, width, height, value, format, hasFormat, axisX, axisY, partRange, xTickLabel, scaleDomain, visibleRows, seriesGroups } = context;
     const bucket = (row: AutkDatum) => String(value(row, 0));
     const amount = (row: AutkDatum) => Number(value(row, 1));
+    context.setAnnotationObservations?.({ axes: ['y'], rows: context.rows.map(row => ({ y: amount(row) })) });
     const xDomain = scaleDomain?.('x', 'categorical');
     const yDomain = scaleDomain?.('y', 'numeric');
     const order = new Map(xDomain?.map((key, i) => [key, i]));
     const rows = (xDomain ? visibleRows?.(row => order.has(bucket(row))) ?? context.rows : context.rows).slice()
         .sort((a, b) => xDomain ? order.get(bucket(a))! - order.get(bucket(b))! : compareBuckets(bucket(a), bucket(b)));
-    const index = new Map(rows.map((row, i) => [row, xDomain ? order.get(bucket(row))! : i]));
+    const keys = xDomain ?? (seriesGroups ? [...new Set(rows.map(bucket))] : rows.map(bucket));
+    const ranks = new Map(keys.map((key, i) => [key, i]));
+    const index = new Map(rows.map((row, i) => [row, xDomain || seriesGroups ? ranks.get(bucket(row))! : i]));
     const positionOf = (row: AutkDatum) => index.get(row)!;
     // A bucket is written as it is ("2020"), or with the x format the configuration gives, when it reads as a number.
     const label = (key: string) => {
@@ -70,7 +74,6 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
     if (partRange) values.push(...(partRange.additive ? [0] : partRange.extent));
     const [low, high] = values.length > 0 ? [Math.min(...values), Math.max(...values)] : [0, 50];
     const pad = (high - low) * 0.1 || 1;
-    const keys = xDomain ?? rows.map(bucket);
     const x = d3.scaleLinear([0, Math.max(keys.length, 1) - 1], [0, width]);
     const y = d3.scaleLinear(yDomain ?? [partRange?.additive && low >= 0 ? 0 : low - pad, high + pad], [height, 0]);
 
@@ -97,6 +100,17 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
         .attr('dy', '0.4em');
     // The rank scale positions the marks, but the brush exposes the original keys.
     context.setBrushScale?.('x', d3.scalePoint(keys, [0, width]));
+    context.setAnnotationAxis?.('x', {
+        kind: 'categorical',
+        position(key) {
+            const rank = typeof key === 'string' ? ranks.get(key) : undefined;
+            return rank === undefined ? undefined : x(rank);
+        },
+        bounds(key) {
+            const rank = ranks.get(key);
+            return rank === undefined ? undefined : [rank === 0 ? 0 : x(rank - 0.5), rank === keys.length - 1 ? width : x(rank + 0.5)];
+        },
+    });
     axisY(d3.axisLeft(y).ticks(5).tickSizeInner(-width).tickFormat(format(1)));
 
     const series: PlotSeries[] = [];
@@ -120,30 +134,47 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
         series.push({ element: node, rows, path: areaOf });
     }
 
-    const lineOf = (v: (row: AutkDatum) => number | null) => d3.line<AutkDatum>()
-        .defined(row => v(row) !== null)
-        .x(row => x(positionOf(row)))
-        .y(row => y(v(row)!))(rows);
-    const line = group.append('path')
-        .datum(rows)
-        .attr('class', 'autk-line')
-        .attr('fill', 'none')
-        .attr('stroke', PlotStyle.default)
-        .attr('stroke-width', 1.5)
-        .attr('d', lineOf(amount));
-    const node = line.node();
-    if (!node) throw new Error('SVG element could not be created.');
-    series.push({ element: node, rows, path: lineOf });
+    const points = new Map<string, Map<string, { x: number; y: number; color: string }>>();
+    if (seriesGroups) context.setAnnotationSeriesPoint?.((key, bucketKey) => points.get(key)?.get(bucketKey));
+    for (const input of seriesGroups ?? [{ key: '', color: PlotStyle.default, rows }]) {
+        const members = seriesGroups ? input.rows.filter(row => index.has(row)).sort((a, b) => positionOf(a) - positionOf(b)) : rows;
+        if (seriesGroups && members.length === 0) continue;
+        const layer = seriesGroups ? group.append('g').attr('data-series', input.key) : group;
+        const segments: AutkDatum[][] = [[]];
+        for (const [i, row] of members.entries()) {
+            if (seriesGroups && i > 0 && positionOf(row) - positionOf(members[i - 1]) > 1) segments.push([]);
+            segments[segments.length - 1].push(row);
+        }
+        const lineOf = (v: (row: AutkDatum) => number | null) => {
+            const line = d3.line<AutkDatum>().defined(row => v(row) !== null)
+                .x(row => x(positionOf(row))).y(row => y(v(row)!));
+            return segments.map(segment => line(segment)).join('') || null;
+        };
+        const line = layer.append('path')
+            .datum(members)
+            .attr('class', 'autk-line')
+            .attr('fill', 'none')
+            .attr('stroke', input.color)
+            .attr('stroke-width', 1.5)
+            .attr('pointer-events', seriesGroups ? 'none' : null)
+            .attr('d', lineOf(amount));
+        const node = line.node();
+        if (!node) throw new Error('SVG element could not be created.');
+        series.push({ element: node, rows: members, path: lineOf });
 
-    group.selectAll('circle.autkMark')
-        .data(rows)
-        .join('circle')
-        .attr('class', 'autkMark')
-        .attr('cx', row => x(positionOf(row)))
-        .attr('cy', row => y(amount(row)))
-        .attr('r', 5)
-        .append('title')
-        .text(row => `${label(bucket(row))}: ${d3.format('~s')(amount(row))}`);
+        if (seriesGroups) points.set(input.key, new Map(members.map(row => [bucket(row), {
+            x: x(positionOf(row)), y: y(amount(row)), color: input.color,
+        }])));
+        layer.selectAll('circle.autkMark')
+            .data(members)
+            .join('circle')
+            .attr('class', 'autkMark')
+            .attr('cx', row => x(positionOf(row)))
+            .attr('cy', row => y(amount(row)))
+            .attr('r', 5)
+            .append('title')
+            .text(row => `${seriesGroups ? `${input.key} · ` : ''}${label(bucket(row))}: ${d3.format('~s')(amount(row))}`);
+    }
 
     group.selectAll('text.autk-empty')
         .data(rows.length === 0 ? ['No series data available'] : [])
@@ -164,6 +195,8 @@ function drawSeries(context: PlotDrawContext, filled: boolean): { highlight: Par
 export const linechart: PlotDefinition = {
     name: 'linechart',
     label: 'Linechart',
+    annotations: 'reference',
+    series: true,
     transforms: ['reduce-series', 'binning-events', 'series'],
     requiresTransform: true,
     topK: false,
@@ -176,5 +209,7 @@ export const areachart: PlotDefinition = {
     ...linechart,
     name: 'areachart',
     label: 'Area chart',
+    annotations: undefined,
+    series: undefined,
     draw: context => drawSeries(context, true),
 };

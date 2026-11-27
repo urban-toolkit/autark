@@ -4,7 +4,8 @@ import type { EventEmitter } from '@urban-toolkit/autk-core';
 
 import type { PlotEventRecord } from './types-events';
 
-import { PlotBaseInteractive } from './plot-base-interactive';
+import type { PlotAnnotation } from './annotations';
+import type { PlotBaseInteractive } from './plot-base-interactive';
 import type { ProvenanceModel } from './provenance';
 import type { FeatureShare } from './types-provenance';
 
@@ -43,7 +44,7 @@ import {
  */
 export class AutkPlot {
     /** Plot drawing the configured definition. */
-    private _plot: PlotBaseInteractive;
+    private _plot: RegisteredPlot;
     /** Active plot type handled by this wrapper instance. */
     private _type: PlotType;
 
@@ -136,6 +137,16 @@ export class AutkPlot {
     }
 
     /**
+     * Replaces reference marks without changing the data, domains, or selection.
+     * Pass an empty list to clear the overlay.
+     *
+     * @throws If any annotation is invalid or unsupported by the plot.
+     */
+    public setAnnotations(list: readonly PlotAnnotation[]): void {
+        this._plot.setAnnotations(list);
+    }
+
+    /**
      * Replaces the plot's data collection and redraws in place.
      *
      * @param collection New GeoJSON feature collection to render.
@@ -179,7 +190,7 @@ export class AutkPlot {
      * @returns Plot instance drawing that definition.
      * @throws If no plot is registered under the name.
      */
-    private createPlot(div: HTMLElement, config: UnifiedPlotConfig): PlotBaseInteractive {
+    private createPlot(div: HTMLElement, config: UnifiedPlotConfig): RegisteredPlot {
         switch (config.type) {
             case 'registered': {
                 const { type, ...plotConfig } = config;

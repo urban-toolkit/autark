@@ -372,13 +372,18 @@ export abstract class PlotBaseData {
         }
 
         const inputColumns = this._sourceAxisAttributes.filter(column => column !== '@transform');
-        const executed = run(this._data, this._transformConfig, inputColumns);
+        const executed = this.executeTransform(this._data, this._transformConfig, inputColumns);
         const resolved = this.resolveTransformResult(executed);
 
         this._transformProvenance = { ...executed.provenance, rowIds: resolved.rowIds ?? executed.provenance.rowIds };
         this._data = resolved.rows;
         this._transformAttributes = resolved.axisAttributes;
         this._transformColorAttribute = resolved.colorAttribute;
+    }
+
+    /** Executes a transform on the filtered source rows. */
+    protected executeTransform(rows: AutkDatum[], config: PlotTransformConfig, columns: string[]): ExecutedPlotTransform {
+        return run(rows, config, columns);
     }
 
     /**

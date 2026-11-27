@@ -26,6 +26,8 @@ const POINT_RADIUS = 5;
 export const scatterplot: PlotDefinition = {
     name: 'scatterplot',
     label: 'Scatterplot',
+    annotations: 'reference',
+    series: true,
     topK: false,
     validate: config => {
         if ((config.attributes?.axis?.length ?? 0) < 2) throw new Error('Scatterplot requires two dimensions.');
@@ -72,7 +74,11 @@ export function pointTitle(context: PlotDrawContext, count: number): (row: AutkD
  * @returns The x and y scales.
  */
 export function gridAxes(context: PlotDrawContext): [d3.ScaleLinear<number, number>, d3.ScaleLinear<number, number>] {
-    const { rows, value, width, height, format, axisX, axisY, scaleDomain } = context;
+    const { rows, value, width, height, format, axisX, axisY, scaleDomain, setAnnotationObservations } = context;
+    if (setAnnotationObservations) {
+        const number = (raw: unknown) => typeof raw === 'number' || (typeof raw === 'string' && raw.trim()) ? Number(raw) : undefined;
+        setAnnotationObservations({ axes: ['x', 'y'], rows: rows.map(row => ({ x: number(value(row, 0)), y: number(value(row, 1)) })) });
+    }
     // Rows with no number on an axis (such as the cells of binning-2d) would all sit at zero.
     for (const index of [0, 1]) {
         if (rows.length > 0 && !rows.some(row => Number.isFinite(Number(value(row, index))) && value(row, index) !== '')) {
