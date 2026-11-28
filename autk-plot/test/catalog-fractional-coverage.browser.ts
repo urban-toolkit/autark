@@ -13,7 +13,7 @@ import * as d3 from 'd3';
 import { describe, expect, test } from 'vitest';
 
 import * as autkPlot from '../src';
-import type { DensityPointRow, FeatureShare, PlotEventData, UnifiedPlotConfig } from '../src';
+import type { DensityPointRow, PlotEventData, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection } from './fixtures';
 import { effectiveBox } from './svg-geometry';
@@ -112,12 +112,12 @@ describe('density chart', () => {
         const { plot, points, rowId } = mount(density(H));
         const all = points().map(rowId);
         // The whole curve covers every feature fully.
-        for (const share of plot.provenance.featureShares(all)) {
-            expect(share.selectedUnits / share.totalUnits).toBeCloseTo(1, 10);
+        for (const entry of Object.values(plot.provenance.featureShares(all))) {
+            expect(entry!.feature!.selectedUnits / entry!.feature!.totalUnits).toBeCloseTo(1, 10);
         }
         // Half the curve covers some features only in part: shares are continuous.
         const half = points().filter(p => p.x <= d3.median(lengths())!).map(rowId);
-        const ratios = plot.provenance.featureShares(half).map(s => s.selectedUnits / s.totalUnits);
+        const ratios = Object.values(plot.provenance.featureShares(half)).map(s => s!.feature!.selectedUnits / s!.feature!.totalUnits);
         expect(ratios.some(r => r > 0.01 && r < 0.99)).toBe(true);
         expect(ratios.every(r => r > 0 && r <= 1 + 1e-12)).toBe(true);
     });
@@ -128,9 +128,9 @@ describe('density chart', () => {
         const threshold = d3.median(values)!;
         const half = points().filter(p => p.x <= threshold);
         const mass = (feature: number, rows: DensityPointRow[]) => d3.sum(rows, p => kernel((p.x - values[feature]) / H));
-        for (const share of plot.provenance.featureShares(half.map(rowId))) {
-            const expected = mass(share.feature, half) / mass(share.feature, points());
-            expect(share.selectedUnits / share.totalUnits).toBeCloseTo(expected, 10);
+        for (const [id, entry] of Object.entries(plot.provenance.featureShares(half.map(rowId)))) {
+            const expected = mass(Number(id), half) / mass(Number(id), points());
+            expect(entry!.feature!.selectedUnits / entry!.feature!.totalUnits).toBeCloseTo(expected, 10);
         }
     });
 
@@ -144,12 +144,11 @@ describe('density chart', () => {
         marks.find(m => (m as unknown as { __data__: DensityPointRow }).__data__.autkIds.length > 0)!
             .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-        const shares = emitted[0].shares as FeatureShare[];
+        const shares = Object.entries(emitted[0].shares!);
         expect(shares.length).toBeGreaterThan(0);
-        expect(shares.every(s => s.selectedUnits < s.totalUnits)).toBe(true);
-        for (const share of shares) {
-            const disc = target.div.querySelectorAll('.autkPartial')[shares.indexOf(share)];
-            expect(disc).toBeDefined();
+        expect(shares.every(([, s]) => s?.feature && s.feature.selectedUnits < s.feature.totalUnits)).toBe(true);
+        for (const [id] of shares) {
+            expect(target.div.querySelector(`.autkPartial[data-autk-provenance="mark:feature:${id}"]`)).not.toBeNull();
         }
         const radii = Array.from(target.div.querySelectorAll('.autkPartial')).map(d => effectiveBox(d)!.width / 2);
         expect(radii.every(r => r > 0 && r < 5)).toBe(true);

@@ -2,9 +2,8 @@
  * Orchestration of the case study: the regions, the Autark map, the 24 linked
  * plots, and the plots drawn by the two labs.
  *
- * Every plot forwards its selection, with feature shares when it aggregates
- * rows, to all the others and to the map, and each one highlights only the part
- * of its marks that the selection produces. Picking regions on the map selects
+ * Plots exchange feature and series coverage. The map receives only feature
+ * IDs and highlights whole regions. Picking regions on the map selects
  * them in every plot. The page filter keeps only the regions that meet its
  * condition in every plot (exclusion, 1:0); the map keeps all regions, so
  * picking an excluded one shows, in each plot's provenance path, where and why
@@ -39,8 +38,9 @@ export class ProvenanceApp {
     private plots: autkPlot.AutkPlot[] = [];
     private labs: Lab[] = [];
     private settings: PlotSettings = { reducer: 'count', filter: null };
+    private seriesFields = new WeakMap<autkPlot.AutkPlot, string>();
     /** Last selection sent between views, so a lab plot drawn later starts in sync. */
-    private current: PlotEventData | null = null;
+    private current: { data: PlotEventData; seriesField?: string } | null = null;
 
     /**
      * Loads the data, the map, and the plots.
@@ -102,6 +102,7 @@ export class ProvenanceApp {
             const div = document.querySelector<HTMLElement>(entry.div)!;
             try {
                 const plot = createPlot(div, withReducer(entry.config, this.settings.reducer), entry.event, this.regions, this.settings);
+                if (entry.config.attributes?.series) this.seriesFields.set(plot, entry.config.attributes.series);
                 plot.events.on(entry.event, data => this.select(data, plot));
                 this.plots.push(plot);
             } catch (error) {
@@ -143,11 +144,20 @@ export class ProvenanceApp {
 
     /** Sends a selection from one view (or the map, `null`) to all the others. */
     private select(data: PlotEventData, from: autkPlot.AutkPlot | null): void {
+        const seriesField = from ? this.seriesFields.get(from) : undefined;
         this.views().forEach(plot => {
-            if (plot !== from) plot.setSelection(data.selection, data.shares);
+            if (plot !== from) this.applySelection(plot, data, seriesField);
         });
         if (from) this.map?.highlight(data.selection);
-        this.current = data;
+        this.current = { data, seriesField };
+    }
+
+    /** Do not match cohort labels across plots grouped by different properties. */
+    private applySelection(plot: autkPlot.AutkPlot, { selection, shares }: PlotEventData, sourceField?: string): void {
+        const targetField = this.seriesFields.get(plot);
+        const featureOnly = shares && sourceField && targetField && sourceField !== targetField;
+        plot.setSelection(selection, featureOnly ? Object.fromEntries(Object.entries(shares).flatMap(([id, entry]) =>
+            entry?.feature ? [[id, { feature: entry.feature }]] : [])) : shares);
     }
 
     /** Draws a lab's plot with the page's settings; returns the error when the plot refuses it. */
@@ -165,8 +175,9 @@ export class ProvenanceApp {
             return (error as Error).message;
         }
         lab.plot = plot;
+        if (lab.config.attributes?.series) this.seriesFields.set(plot, lab.config.attributes.series);
         plot.events.on(event, data => this.select(data, plot));
-        if (this.current) plot.setSelection(this.current.selection, this.current.shares);
+        if (this.current) this.applySelection(plot, this.current.data, this.current.seriesField);
         return undefined;
     }
 

@@ -100,7 +100,7 @@ export async function taxiMap(zoneData: TaxiZones, selectable: number[], pick: (
                 map.updateThematic('links', { collection: links, property: 'properties.route' });
                 map.updateRenderInfo('links', { isColorMap: true, opacity: 1, polylinesWidth: 220 });
             } else {
-                map.updateRenderInfo('links', { opacity: 0.8, polylinesWidth: compact ? 45 : 100 });
+                map.updateRenderInfo('links', { color: { r: 173, g: 0, b: 92, alpha: 1 }, opacity: 1, polylinesWidth: compact ? 45 : 100 });
             }
             hasLinks = true;
             map.setSelection('choices', active);

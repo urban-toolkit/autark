@@ -110,7 +110,7 @@ describe('pie and donut (partition, N:1)', () => {
         plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         div.querySelector('.autkMark')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(sortNumbers(emitted[0].selection)).toEqual(sortNumbers(rows()[0].autkIds));
-        expect(emitted[0].shares!.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
+        expect(Object.values(emitted[0].shares!).every(s => s?.feature && s.feature.selectedUnits === s.feature.totalUnits)).toBe(true);
     });
 });
 
@@ -209,8 +209,8 @@ describe('bubble chart (identity, 1:1)', () => {
 
     test('inverse direction: the inner disc covers the share of the bubble area', () => {
         const { div, plot, partials } = mount(bubble());
-        const share: FeatureShare = { feature: 3, selectedUnits: 1, totalUnits: 4 };
-        plot.setSelection([3], [share]);
+        const share: FeatureShare = { selectedUnits: 1, totalUnits: 4 };
+        plot.setSelection([3], { 3: { feature: share } });
         const mark = div.querySelector('.autkMark[data-autk-provenance="mark:feature:3"]');
         expect(effectiveBox(partials()[0])!.width / 2).toBeCloseTo(effectiveBox(mark)!.width / 2 * Math.sqrt(1 / 4));
     });

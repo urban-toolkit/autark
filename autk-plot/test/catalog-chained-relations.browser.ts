@@ -220,7 +220,7 @@ describe('treemap and sunburst (hierarchy)', () => {
         const parent = marks().find(m => datumOf<HierarchyNodeRow>(m).level === 0)!;
         parent.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(sortNumbers(emitted[0].selection)).toEqual(sortNumbers(datumOf<HierarchyNodeRow>(parent).autkIds));
-        expect(emitted[0].shares!.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
+        expect(Object.values(emitted[0].shares!).every(s => s?.feature && s.feature.selectedUnits === s.feature.totalUnits)).toBe(true);
     });
 });
 
@@ -273,7 +273,7 @@ describe('radar (fold: unfold by measure, then partition)', () => {
         const emitted: PlotEventData[] = [];
         plot.events.on(autkPlot.PlotEvent.CLICK, data => emitted.push(data));
         marks()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        expect(emitted[0].shares!.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
+        expect(Object.values(emitted[0].shares!).every(s => s?.feature && s.feature.selectedUnits === s.feature.totalUnits)).toBe(true);
     });
 });
 

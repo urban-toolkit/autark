@@ -57,7 +57,7 @@ plot.setSelection([0, 4, 10]);
 * `instance`: Exposes the underlying plot implementation for advanced use.
 * `selection`: Returns selected source feature ids.
 * `events`: Typed event bus for click, brush, and other supported plot events.
-* `setSelection(selection, shares?)`: Applies a selection by source feature ids, optionally with the share of each feature covered in the emitting view.
+* `setSelection(selection, shares?)`: Applies a selection by source feature IDs, with optional series membership and coverage keyed by feature ID.
 * `setAnnotations(list)`: Replaces reference marks without redrawing the data. Pass `[]` to clear them.
 * `updateCollection(collection)`: Replaces the source GeoJSON collection and redraws.
 * `draw()`: Redraws the plot synchronously.
@@ -101,7 +101,7 @@ plot.setAnnotations([
 ]);
 ```
 
-Grouped bars require one finite, nonnegative number per `(category, series)` pair. Missing pairs leave empty slots; duplicate pairs raise an error. Series mode does not change source feature IDs or selection events.
+Grouped bars require one finite, nonnegative number per `(category, series)` pair. Missing pairs leave empty slots; duplicate pairs raise an error. Grouped selection keeps source feature IDs and legend colors. A click toggles the clicked mark; a brush can select marks in multiple series.
 
 Fixed annotations are available on scatter, bubble, bar, and line charts. A line takes one coordinate (`x` or `y`), a point takes both, and a band takes a two-value interval on one axis. Use numbers on numeric axes and unformatted keys on categorical axes. Each annotation has a unique nonempty `id` and may specify a `label` or CSS `color`. Annotations do not affect selection, automatic domains, or provenance. A reference outside the view is hidden or clipped; an invalid replacement leaves the previous list installed.
 
@@ -239,6 +239,35 @@ map.events.on(MapEvent.HOVER, ({ selection, source }) => {
   if (source === 'pointer') plot.setHover(selection);
 });
 ```
+
+### Linked selection and shares
+
+`selection` contains each selected source feature ID once. Click and brush events can also carry `shares`, a `SelectionShares` object keyed by feature ID:
+
+```ts
+{
+  selection: [12],
+  shares: {
+    12: {
+      feature: { selectedUnits: 1, totalUnits: 3 },
+      series: [{ id: 'After', selectedUnits: 1, totalUnits: 3 }],
+    },
+  },
+}
+```
+
+`feature` is coverage across the feature's contributions in the emitting view. If provenance distinguishes stages or unit groups, the highest coverage is reported rather than summing groups. Each `series` entry identifies an eligible series and may report coverage within it. Entries for grouped one-to-one marks can be just `{ id: 'After' }`. A series membership entry without coverage can still highlight a whole mark. Ungrouped plots omit the series list and ignore any incoming series restriction.
+
+```ts
+source.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+  target.setSelection(selection, shares); // Plots sharing a feature ID space and compatible series keys
+  map.setSelection('regions', selection); // The map highlights whole features only
+});
+```
+
+If two plots group the same features differently, forward only the feature-level entries (or just `selection` if partial coverage is not needed). Series keys are local grouping values, not cross-collection IDs. Aggregating receivers recompute subsets from their own contributors; one-to-one receivers use incoming coverage to draw partial marks. Registered plots with custom highlights receive eligible `parts` and `colorOf(row)` for the row's selection color. Return one path descriptor per input series if a grouped custom plot draws linked subset paths.
+
+**Migration:** `PlotEventData.shares`, `setSelection`'s optional second argument, and the result of `provenance.featureShares()` now use the keyed object, not an array. Replace `shares.find(item => item.feature === id)` with `shares?.[id]?.feature`. Callers that forward the event's shares directly, or only use `selection`, need no call-site change once rebuilt together.
 
 ### Brush bounds
 

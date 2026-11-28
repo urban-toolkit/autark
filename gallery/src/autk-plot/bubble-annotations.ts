@@ -20,12 +20,11 @@ function profile(trips: TaxiTrip[][]) {
     })));
 }
 
-function distribution(trips: TaxiTrip[][], selectedHours: Set<number> | null) {
+function distribution(trips: TaxiTrip[][]) {
     return chartCollection(trips.flatMap((cohort, airport) => {
-        const selected = selectedHours ? cohort.filter(trip => selectedHours.has(trip.hour)) : cohort;
         const counts = new Array<number>(bins.length).fill(0);
-        for (const trip of selected) counts[Math.min(bins.length - 1, Math.floor(trip.minutes / binWidth))]++;
-        return selected.length === 0 ? [] : bins.map((bin, i) => ({ bin, airport: groups[airport], share: counts[i] / selected.length }));
+        for (const trip of cohort) counts[Math.min(bins.length - 1, Math.floor(trip.minutes / binWidth))]++;
+        return cohort.length === 0 ? [] : bins.map((bin, i) => ({ bin, airport: groups[airport], share: counts[i] / cohort.length }));
     }));
 }
 
@@ -49,23 +48,23 @@ async function main(): Promise<() => void> {
     });
     timeline.setAnnotations([{ id: 'morning', type: 'band', x: [hourBuckets[7], hourBuckets[9]], label: 'Morning rush', color: '#126a82' }]);
     const histogram = new AutkPlot(document.querySelector<HTMLElement>('#taxi-distribution')!, {
-        type: 'barchart', collection: distribution(trips, null), width: 'auto', height: 325,
+        type: 'barchart', collection: distribution(trips), width: 'auto', height: 325,
         attributes: { axis: ['bin', 'share'], series: 'airport' }, scales: { x: { domain: bins }, y: { domain: [0, 1] } },
         ticks: { x: { label: key => key }, y: { format: '.0%' } },
         labels: { axis: ['Trip duration (minutes)', 'Share of trips'] },
         margins: { top: 34, right: 16, bottom: 53, left: 58 }, style: { colorMap },
     });
-    const showHours = (selection: number[] | null) => {
-        const selected = selection ? new Set(selection) : null;
-        const counts = trips.map(cohort => selected ? cohort.filter(trip => selected.has(trip.hour)).length : cohort.length);
-        histogram.updateCollection(distribution(trips, selected));
-        const label = selected ? [...selected].sort((a, b) => a - b).map(hour => hours[hour]).join(', ') || 'No pickup hours' : 'All pickup hours';
-        distributionStatus.textContent = `${label} · ${counts[0].toLocaleString('en-US')} JFK · ${counts[1].toLocaleString('en-US')} LaGuardia`;
+    const showHours = (selected: Map<string, Set<number>> | null) => {
+        const visibleTrips = selected ? trips.map((cohort, i) => cohort.filter(trip => selected.get(groups[i])?.has(trip.hour))) : trips;
+        histogram.updateCollection(distribution(visibleTrips));
+        const selectedHours = selected && [...new Set([...selected.values()].flatMap(set => [...set]))].sort((a, b) => a - b);
+        const label = selectedHours ? selectedHours.map(hour => hours[hour]).join(', ') || 'No pickup hours' : 'All pickup hours';
+        distributionStatus.textContent = `${label} · ${visibleTrips[0].length.toLocaleString('en-US')} JFK · ${visibleTrips[1].length.toLocaleString('en-US')} LaGuardia`;
     };
     const updateLabels = () => {
         const total = trips.reduce((count, cohort) => count + cohort.length, 0);
         summary.textContent = `${total.toLocaleString('en-US')} trips to ${zones.get(destination)!.name}`;
-        pointStatus.textContent = 'Hover a point for its trip count. Click an hour or brush across the timeline.';
+        pointStatus.textContent = 'Hover for a trip count. Click an airport’s point or brush hours for both airports.';
     };
     const map = await taxiMap(zoneData, [...airports, ...destinations], id => {
         if (destinations.includes(id) && id !== destination) {
@@ -86,10 +85,21 @@ async function main(): Promise<() => void> {
     destinationControl.addEventListener('change', onDestination);
     timeline.events.on(PlotEvent.BRUSH_X, ({ extent }) => {
         const x = extent?.data?.x;
-        showHours(x?.kind === 'categorical' ? x.keys.map(key => hourBuckets.indexOf(key)).filter(hour => hour >= 0) : null);
+        const selected = x?.kind === 'categorical' ? new Set(x.keys.map(key => hourBuckets.indexOf(key)).filter(hour => hour >= 0)) : null;
+        showHours(selected && new Map(groups.map(id => [id, selected])));
     });
-    timeline.events.on(PlotEvent.CLICK, ({ selection }) => showHours(selection.length
-        ? selection.map(id => hours.indexOf(points.features[id].properties.hour)) : null));
+    timeline.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+        const selected = new Map<string, Set<number>>();
+        for (const id of selection) {
+            const { hour } = points.features[id].properties;
+            for (const { id: airport } of shares?.[id]?.series ?? []) {
+                const set = selected.get(airport) ?? new Set<number>();
+                set.add(hours.indexOf(hour));
+                selected.set(airport, set);
+            }
+        }
+        showHours(selection.length ? selected : null);
+    });
     timeline.events.on(PlotEvent.HOVER, ({ selection }) => {
         const point = points.features[selection[0]]?.properties;
         if (!point) { updateLabels(); return; }

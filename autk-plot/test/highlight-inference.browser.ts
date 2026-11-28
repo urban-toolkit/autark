@@ -41,7 +41,7 @@ function mount(draw: PlotDefinition['draw'], config: Omit<UnifiedPlotConfig, 'ty
         margins: { left: 40, right: 40, top: 40, bottom: 40 }, ...config,
     } as UnifiedPlotConfig);
     const instance = plot.instance as unknown as { highlightDesigns: HighlightDesign[]; segregatedParts(): autkPlot.SegregatedPart[] };
-    const select = (features: number[], shares?: autkPlot.FeatureShare[]) => plot.setSelection(features, shares);
+    const select = (features: number[], shares?: autkPlot.SelectionShares) => plot.setSelection(features, shares);
     const half = collection.features.map((_f, i) => i).filter(i => i % 2 === 0);
     const marks = () => Array.from(div.querySelectorAll<SVGGraphicsElement>('.autkMark'));
     const partOf = (mark: Element) => Array.from(div.querySelectorAll<SVGGraphicsElement>('.autkPartial'))
@@ -170,7 +170,7 @@ describe('the channel is inferred from the marks', () => {
                 .attr('fill', 'none').attr('points', r => `0,${y(Number(value(r)))} ${WIDTH},${HEIGHT - y(Number(value(r)))}`);
         }, { attributes: { axis: ['shape_area'] } }, { color: 'stroke' });
         expect(designs()).toMatchObject([{ kind: 'stroke', mode: 'custom', preset: 'trace' }]);
-        select(half, regions().features.map((_f, feature) => ({ feature, selectedUnits: 1, totalUnits: 4 })));
+        select(half, Object.fromEntries(half.map(id => [id, { feature: { selectedUnits: 1, totalUnits: 4 } }])));
         const copy = partOf(marks()[0])!;
         expect(copy.getAttribute('pathLength')).toBe('1');
         // Browsers serialize the list with commas.
@@ -374,7 +374,7 @@ describe('the channel is inferred from the marks', () => {
                 .selectAll('td').data(r => [r.ntaname]).join('td').text(String);
         }, { attributes: { axis: ['ntaname', 'shape_area'] }, events: [autkPlot.PlotEvent.CLICK] });
         expect(designs()).toMatchObject([{ kind: 'html', mode: 'custom', preset: 'glyph' }]);
-        select(half, half.map(feature => ({ feature, selectedUnits: 1, totalUnits: 4 })));
+        select(half, Object.fromEntries(half.map(id => [id, { feature: { selectedUnits: 1, totalUnits: 4 } }])));
         const first = marks()[0] as unknown as HTMLElement;
         // Browsers serialize 25.00% as 25%.
         expect(first.style.backgroundImage).toMatch(/linear-gradient\(to right, .+ 25(\.0+)?%, transparent 25(\.0+)?%\)/);

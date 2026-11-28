@@ -93,7 +93,7 @@ function featureSharesReference(stages: ProvenanceStage[], contributions: Proven
         const current = best.get(source);
         if (!current || share.selectedUnits / share.totalUnits > current.selectedUnits / current.totalUnits) best.set(source, share);
     }
-    return Array.from(best.values());
+    return Object.fromEntries(Array.from(best.values(), ({ feature, ...share }) => [feature, { feature: share }]));
 }
 
 // ---- Random models ----------------------------------------------------------

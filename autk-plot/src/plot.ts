@@ -7,7 +7,7 @@ import type { PlotEventRecord } from './types-events';
 import type { PlotAnnotation } from './annotations';
 import type { PlotBaseInteractive } from './plot-base-interactive';
 import type { ProvenanceModel } from './provenance';
-import type { FeatureShare } from './types-provenance';
+import type { SelectionShares } from './types-provenance';
 
 
 import {
@@ -114,14 +114,14 @@ export class AutkPlot {
      * Applies a new selection to the plot as source feature ids.
      *
      * @param selection Source feature ids to highlight/select.
-     * @param shares Optional share of each feature covered by the selection in
-     * the emitting view, as sent in `PlotEventData.shares`.
-     * @throws Never throws.
+     * @param shares Optional series membership and coverage keyed by source
+     * feature index, as sent in `PlotEventData.shares`.
+     * @throws TypeError if shares are passed as an array instead of a keyed object.
      * @example
      * plot.setSelection([0, 3, 7]);
      * other.events.on('click', ({ selection, shares }) => plot.setSelection(selection, shares));
      */
-    public setSelection(selection: number[], shares?: FeatureShare[]): void {
+    public setSelection(selection: number[], shares?: SelectionShares): void {
         this._plot.setSelection(selection, shares);
     }
 

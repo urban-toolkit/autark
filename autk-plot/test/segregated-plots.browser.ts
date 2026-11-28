@@ -10,7 +10,7 @@
 import { describe, expect, test } from 'vitest';
 
 import * as autkPlot from '../src';
-import type { FeatureShare, UnifiedPlotConfig } from '../src';
+import type { PlotEventData, SelectionShares, UnifiedPlotConfig } from '../src';
 
 import { loadGalleryCollection, withSyntheticEvents } from './fixtures';
 import { effectiveBox } from './svg-geometry';
@@ -101,28 +101,28 @@ describe('linechart (N:N)', () => {
 
     test('clicking a bucket emits the share of each feature it covers', () => {
         const { div, plot } = mount(linechart());
-        const emitted: { selection: number[]; shares?: FeatureShare[] }[] = [];
+        const emitted: PlotEventData[] = [];
         plot.events.on(autkPlot.PlotEvent.CLICK, (data) => emitted.push(data));
 
         div.querySelectorAll('.autkMark')[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
         const { selection, shares } = emitted[0];
-        expect(shares!.map(s => s.feature).sort((a, b) => a - b)).toEqual([...selection].sort((a, b) => a - b));
-        for (const share of shares!) {
-            const events = plot.provenance.contributions.filter(u => u.source === `feature:${share.feature}`).length;
-            expect(share.totalUnits).toBe(events);
-            expect(share.selectedUnits).toBeGreaterThan(0);
+        expect(Object.keys(shares!).map(Number).sort((a, b) => a - b)).toEqual([...selection].sort((a, b) => a - b));
+        for (const [id, entry] of Object.entries(shares!)) {
+            const events = plot.provenance.contributions.filter(u => u.source === `feature:${id}`).length;
+            expect(entry!.feature!.totalUnits).toBe(events);
+            expect(entry!.feature!.selectedUnits).toBeGreaterThan(0);
         }
-        expect(shares!.some(s => s.selectedUnits < s.totalUnits)).toBe(true);
+        expect(Object.values(shares!).some(s => s?.feature && s.feature.selectedUnits < s.feature.totalUnits)).toBe(true);
     });
 });
 
 describe('one-to-one plots receiving shares (1:N inverse direction)', () => {
-    const shares: FeatureShare[] = [
-        { feature: 0, selectedUnits: 1, totalUnits: 4 },
-        { feature: 3, selectedUnits: 3, totalUnits: 3 },
-    ];
-    const ids = shares.map(s => s.feature);
+    const shares: SelectionShares = {
+        0: { feature: { selectedUnits: 1, totalUnits: 4 } },
+        3: { feature: { selectedUnits: 3, totalUnits: 3 } },
+    };
+    const ids = Object.keys(shares).map(Number);
     const collection = () => loadGalleryCollection('mnt_neighs_proj.geojson');
 
     test('scatterplot: inner disc area is the share of the point', () => {

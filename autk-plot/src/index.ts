@@ -81,6 +81,8 @@ export type {
 	ProvenancePath,
 	MarkContribution,
 	FeatureShare,
+	SeriesShare,
+	SelectionShares,
 } from './types-provenance';
 
 // ─── Transform helpers ──────────────────────────────────────────────────────

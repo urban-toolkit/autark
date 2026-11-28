@@ -81,9 +81,13 @@ async function main(): Promise<() => void> {
                 });
             }
         });
-        hourly.events.on(PlotEvent.CLICK, ({ selection }) => {
-            scatters[0].setSelection(selection.filter(id => id < offset));
-            scatters[1].setSelection(selection.filter(id => id >= offset).map(id => id - offset));
+        hourly.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+            scatters.forEach((scatter, i) => {
+                const ids = selection.filter(id => i === 0 ? id < offset : id >= offset);
+                const offsetBy = i === 0 ? 0 : offset;
+                const localShares = shares && Object.fromEntries(ids.map(id => [id - offsetBy, shares[id]]));
+                scatter.setSelection(ids.map(id => id - offsetBy), localShares);
+            });
             setStatus(selection.length);
         });
         plots = [...scatters, hourly];

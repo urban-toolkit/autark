@@ -21,7 +21,7 @@ import { PlotEvent } from './types-events';
 import { PlotBaseData } from './plot-base-data';
 
 import type { BrushExtent, PlotEventData } from './types-events';
-import type { FeatureShare, MarkContribution, ProvenanceId, ProvenancePath } from './types-provenance';
+import type { FeatureShare, MarkContribution, ProvenanceId, ProvenancePath, SelectionShares } from './types-provenance';
 import { markId } from './provenance';
 import { renderProvenancePathView } from './provenance/path-view';
 import { othersLabelOf } from './transforms/top-k';
@@ -83,8 +83,12 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected _hoverFeatureIds: Set<number> = new Set();
     /** Marks currently painted with the hover color, restored when the hover moves. */
     private _hoverPainted: Set<HTMLElement | SVGElement> = new Set();
-    /** Feature shares received with the last external selection, keyed by feature index. */
-    private _selectionShares: Map<number, FeatureShare> | null = null;
+    /** Series identity of each grouped rendered row, independent of its palette color. */
+    protected _seriesByRowId?: ReadonlyMap<ProvenanceId, string>;
+    private _selectionShares?: SelectionShares;
+    private _hasSelectionCoverage = false;
+    private _externalIdsBySeries = new Map<string, Set<number>>();
+    private _localGroupedRowIds = new Set<ProvenanceId>();
     /** Whether the provenance path widget was requested (`provenance.path`). */
     private _pathView: boolean = true;
     /** Whether the provenance path widget is expanded. */
@@ -191,7 +195,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
         this._selectedMarkDatums = new Set();
         this._selectedFeatureIds = new Set();
         this._selectionOrigin = null;
-        this._selectionShares = null;
+        this._selectionShares = undefined;
+        this._hasSelectionCoverage = false;
+        this._externalIdsBySeries.clear();
+        this._localGroupedRowIds.clear();
         this._activeBrushes.clear();
         this.clearBrushVisuals();
         this._brushBehaviors.clear();
@@ -202,13 +209,17 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * Applies an externally authored selection to the plot.
      *
      * @param selection Source feature ids to highlight.
-     * @param shares Optional share of each feature covered by the selection in
-     * the emitting view; one-to-one plots draw only that part of each mark.
-     * @throws Never throws.
+     * @param shares Optional selected series and coverage, keyed by feature index.
      */
-    setSelection(selection: number[], shares?: FeatureShare[]): void {
-        this._selectionShares = shares ? new Map(shares.map(share => [share.feature, share])) : null;
+    setSelection(selection: number[], shares?: SelectionShares): void {
+        if (Array.isArray(shares)) throw new TypeError('Plot shares must be keyed by source feature ID.');
         this._selectedFeatureIds = new Set(selection);
+        this._selectionShares = shares && { ...shares };
+        this._externalIdsBySeries.clear();
+        this._hasSelectionCoverage = selection.some(id => {
+            const entry = this._selectionShares?.[id];
+            return !!entry?.feature || !!entry?.series?.some(series => series.selectedUnits !== undefined);
+        });
         this._selectionOrigin = selection.length > 0 ? 'external' : null;
         this.syncSelectedMarksFromFeatures();
         // A selection from elsewhere replaces this plot's own: its brush no longer describes it.
@@ -354,7 +365,36 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected get segregatedActive(): boolean {
         if (!this.segregatedEnabled) return false;
         if (this._selectionOrigin !== 'external' || this._selectedFeatureIds.size === 0) return false;
-        return this._selectionProjection === 'aggregated' || this._selectionShares !== null;
+        return this._selectionProjection === 'aggregated' || this._hasSelectionCoverage;
+    }
+
+    /** Feature IDs eligible for an external highlight of this row's series. */
+    protected externalFeaturesOf(row: unknown): ReadonlySet<number> {
+        const rowId = this._seriesByRowId && this.rowIdOf(row);
+        const series = rowId === undefined ? undefined : this._seriesByRowId?.get(rowId);
+        if (series === undefined || !this._selectionShares) return this._selectedFeatureIds;
+        let ids = this._externalIdsBySeries.get(series);
+        if (!ids) {
+            ids = new Set();
+            for (const id of this._selectedFeatureIds) {
+                const entries = this._selectionShares[id]?.series;
+                if (!entries?.length || entries.some(entry => entry.id === series)) ids.add(id);
+            }
+            this._externalIdsBySeries.set(series, ids);
+        }
+        return ids;
+    }
+
+    /** Coverage for a one-to-one row; membership alone does not make it partial. */
+    private externalShareOf(row: AutkDatum): FeatureShare | undefined {
+        const id = row.autkIds?.[0];
+        if (id === undefined || !this._selectedFeatureIds.has(id)) return undefined;
+        const entry = this._selectionShares?.[id];
+        const rowId = this._seriesByRowId && this.rowIdOf(row);
+        const series = rowId === undefined ? undefined : this._seriesByRowId?.get(rowId);
+        if (series === undefined || !entry?.series?.length) return entry?.feature;
+        const match = entry.series.find(item => item.id === series);
+        return match?.selectedUnits === undefined ? undefined : match;
     }
 
     /**
@@ -363,20 +403,32 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * Aggregating plots add the share of each selected feature covered by the
      * selected marks, so receiving one-to-one plots can split their marks.
      *
-     * @returns Selected source ids, plus shares when rows are aggregated.
+     * @returns Selected source IDs, plus coverage and/or series membership when available.
      */
     protected selectionEventData(): PlotEventData {
-        // Without the segregated view, or for one-to-one rows, the payload is the selection alone.
-        if (!this.segregatedEnabled || this._selectionProjection !== 'aggregated' || this._selectionOrigin !== 'local') {
-            return { selection: this.selection };
-        }
+        const selection = this.selection;
+        if (this._selectionOrigin !== 'local') return { selection };
+        const aggregated = this.segregatedEnabled && this._selectionProjection === 'aggregated';
+        if (!aggregated && !this._seriesByRowId) return { selection };
 
-        const rowIds: ProvenanceId[] = [];
+        const rows = new Map<ProvenanceId, AutkDatum>();
         for (const datum of this._selectedMarkDatums) {
             const id = this.rowIdOf(datum);
-            if (id) rowIds.push(id);
+            if (id !== undefined) rows.set(id, datum as AutkDatum);
         }
-        return { selection: this.selection, shares: this._provenance.featureShares(rowIds) };
+        const shares = aggregated ? this._provenance.featureShares(rows.keys(), this._seriesByRowId) : {};
+        if (this._seriesByRowId) {
+            for (const [rowId, datum] of rows) {
+                const id = this._seriesByRowId.get(rowId);
+                if (id === undefined) continue;
+                for (const feature of datum.autkIds ?? []) {
+                    const entry = shares[feature] ??= {};
+                    const list = entry.series ??= [];
+                    if (!list.some(series => series.id === id)) list.push({ id });
+                }
+            }
+        }
+        return { selection, shares };
     }
 
     /**
@@ -434,9 +486,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
 
             let part: MarkContribution;
             if (this._selectionProjection === 'aggregated') {
-                part = this._provenance.contribution(rowId, this._selectedFeatureIds);
+                part = this._provenance.contribution(rowId, this.externalFeaturesOf(datum));
             } else {
-                const share = this._selectionShares?.get(datum.autkIds?.[0] ?? -1);
+                const share = this.externalShareOf(datum);
                 if (!share) continue;
                 part = {
                     selectedUnits: share.selectedUnits,
@@ -548,17 +600,18 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     protected isMarkHighlighted(d: unknown): boolean {
         if (d == null || typeof d !== 'object') return false;
 
-        // The segregated view highlights only the selected part, drawn separately.
-        if (this.segregatedActive) return false;
-
         const datum = d as AutkDatum;
+        if (this._selectionOrigin === 'external') {
+            // Partial geometry replaces whole-mark styling only for rows with a part.
+            if (this.segregatedActive && (this._selectionProjection === 'aggregated' || this.externalShareOf(datum))) return false;
+            const ids = this.externalFeaturesOf(datum);
+            return (datum.autkIds ?? []).some(id => ids.has(id));
+        }
+        if (this._seriesByRowId) return this._selectedMarkDatums.has(datum);
 
         if (this._selectionProjection === 'aggregated') {
             if (this._selectionOrigin === 'local') {
                 return this._selectedMarkDatums.has(d as object);
-            }
-            if (this._selectionOrigin === 'external') {
-                return (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
             }
             return false;
         }
@@ -616,8 +669,9 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
     /** Adds or removes a row from the local selection and emits CLICK. */
     private toggleMarkSelection(d: unknown): void {
         if (d == null || typeof d !== 'object') return;
-        // A click adds the mark to the current selection, or takes it out, also when that
-        // selection came from another view (the map).
+        // Grouped plots start a local selection with the actual hit, not with
+        // all the marks inferred from an incoming feature/series selection.
+        if (this._seriesByRowId && this._selectionOrigin === 'external') this._selectedMarkDatums.clear();
         if (this._selectedMarkDatums.has(d as object)) {
             this._selectedMarkDatums.delete(d as object);
         } else {
@@ -1007,18 +1061,19 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      * Restores locally selected aggregated marks after transformed rows are recreated.
      */
     private restoreLocalSelectionAfterDraw(): void {
-        if (this._selectionProjection !== 'aggregated' || this._selectionOrigin !== 'local') {
-            return;
-        }
+        if (this._selectionOrigin !== 'local' || (!this._seriesByRowId && this._selectionProjection !== 'aggregated')) return;
 
         const selectedMarks = new Set<object>();
         for (const datum of this._data) {
-            const ids = datum.autkIds ?? [];
-            if (ids.some(fid => this._selectedFeatureIds.has(fid))) {
+            const selected = this._seriesByRowId
+                ? this._localGroupedRowIds.has(this.rowIdOf(datum)!)
+                : (datum.autkIds ?? []).some(fid => this._selectedFeatureIds.has(fid));
+            if (selected) {
                 selectedMarks.add(datum as object);
             }
         }
         this._selectedMarkDatums = selectedMarks;
+        if (this._seriesByRowId) this.syncSelectedFeaturesFromMarks();
     }
 
     /**
@@ -1259,7 +1314,10 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
      */
     private syncSelectedFeaturesFromMarks(): void {
         const fids = new Set<number>();
+        this._localGroupedRowIds.clear();
         for (const datum of this._selectedMarkDatums) {
+            const rowId = this._seriesByRowId && this.rowIdOf(datum);
+            if (rowId !== undefined) this._localGroupedRowIds.add(rowId);
             const ids = (datum as AutkDatum).autkIds ?? [];
             for (const fid of ids) fids.add(fid);
         }
@@ -1282,7 +1340,8 @@ export abstract class PlotBaseInteractive extends PlotBaseData {
             .each((d) => {
                 if (d == null || typeof d !== 'object') return;
                 const ids = (d as AutkDatum).autkIds ?? [];
-                if (ids.some(fid => this._selectedFeatureIds.has(fid))) {
+                const eligible = this.externalFeaturesOf(d);
+                if (ids.some(fid => eligible.has(fid))) {
                     selectedMarks.add(d as object);
                 }
             });

@@ -148,7 +148,10 @@ describe('provenance path widget: mark parts', () => {
                 type: 'registered', plot: 'one-field-dots', provenance: { path: 'open' },
                 collection: loadGalleryCollection('mnt_neighs_proj.geojson'), attributes: { axis: ['shape_area'] },
             } as UnifiedPlotConfig);
-            expect(() => plot.setSelection([0, 1], [{ feature: 0, selectedUnits: 1, totalUnits: 3 }, { feature: 1, selectedUnits: 2, totalUnits: 3 }])).not.toThrow();
+            expect(() => plot.setSelection([0, 1], {
+                0: { feature: { selectedUnits: 1, totalUnits: 3 } },
+                1: { feature: { selectedUnits: 2, totalUnits: 3 } },
+            })).not.toThrow();
             expect(div.querySelector('.autk-provenance-parts')?.textContent).toMatch(/: 0\.33\/1|: 1\/3|\//);
         } finally {
             autkPlot.unregisterPlot('one-field-dots');

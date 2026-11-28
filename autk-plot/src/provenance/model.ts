@@ -7,8 +7,8 @@
 
 import type { TransformReducer } from '../api';
 import type {
-    FeatureShare,
     MarkContribution,
+    SelectionShares,
     ProvenanceCardinality,
     ProvenanceContribution,
     ProvenanceId,
@@ -18,6 +18,8 @@ import type {
 } from '../types-provenance';
 
 import { cardinality, compose, image, preimage, tupleKey } from './relations';
+
+type ShareIndex = { keys: (string | undefined)[]; totals: Map<string, number> };
 
 /**
  * Provenance id of a source feature.
@@ -64,7 +66,8 @@ export class ProvenanceModel {
     /** Position of each contribution in `_contributions`, grouped by rendered row id. */
     private _indicesByRow: Map<ProvenanceId, number[]> = new Map();
     /** Selection-independent part of `featureShares`, built on first use and cleared when marks are registered. */
-    private _shareIndex: { keys: string[]; totals: Map<string, number> } | undefined;
+    private _shareIndex: ShareIndex | undefined;
+    private _seriesShareIndexes = new WeakMap<ReadonlyMap<ProvenanceId, string>, ShareIndex>();
     /** Cached result of `cardinalities`, cleared when marks are registered. */
     private _cardinalities: { source: string; target: string; cardinality: ProvenanceCardinality }[] | undefined;
 
@@ -160,6 +163,7 @@ export class ProvenanceModel {
     registerMarks(rowIds: ProvenanceId[]): void {
         this._cardinalities = undefined;
         this._shareIndex = undefined;
+        this._seriesShareIndexes = new WeakMap();
         const last = this._stages[this._stages.length - 1];
         if (last.name === 'M') {
             this._stages = this._stages.slice(0, -1);
@@ -338,9 +342,10 @@ export class ProvenanceModel {
      * covers all its units there; the highest share is reported.
      *
      * @param rowIds Selected rendered row ids.
-     * @returns Shares of the features with at least one unit in the selected rows.
+     * @param seriesByRow Optional fixed series lookup for the rendered rows of this draw.
+     * @returns Shares keyed by the features with units in the selected rows.
      */
-    featureShares(rowIds: Iterable<ProvenanceId>): FeatureShare[] {
+    featureShares(rowIds: Iterable<ProvenanceId>, seriesByRow?: ReadonlyMap<ProvenanceId, string>): SelectionShares {
         // Units of the selected rows, in their order among all contributions, so
         // features are reported in the order a scan of every unit would reach them.
         const picked: number[] = [];
@@ -349,30 +354,39 @@ export class ProvenanceModel {
         }
         picked.sort((a, b) => a - b);
 
-        // Units per feature, stage, and group inside the selected rows. Each unit
-        // counts once unless it carries a fractional weight (density).
-        const { keys, totals } = this.shareIndex();
-        const selected = new Map<string, { source: ProvenanceId; units: number }>();
-        for (const index of picked) {
-            const unit = this._contributions[index];
-            const entry = selected.get(keys[index]);
-            if (entry) entry.units += unit.weight ?? 1;
-            else selected.set(keys[index], { source: unit.source, units: unit.weight ?? 1 });
-        }
-
-        const best = new Map<ProvenanceId, FeatureShare>();
-        for (const [key, { source, units: selectedUnits }] of selected) {
-            const share = {
-                feature: Number(source.slice('feature:'.length)),
-                selectedUnits,
-                totalUnits: totals.get(key) ?? selectedUnits,
-            };
-            const current = best.get(source);
-            if (!current || share.selectedUnits / share.totalUnits > current.selectedUnits / current.totalUnits) {
-                best.set(source, share);
+        const shares: SelectionShares = {};
+        // Count each unit once (or by fractional weight), independently for the
+        // feature summary and for coverage within the selected series.
+        for (const series of seriesByRow ? [undefined, seriesByRow] : [undefined]) {
+            const { keys, totals } = this.shareIndex(series);
+            const selected = new Map<string, { index: number; units: number }>();
+            for (const index of picked) {
+                const key = keys[index];
+                if (key === undefined) continue;
+                const weight = this._contributions[index].weight ?? 1;
+                const entry = selected.get(key);
+                if (entry) entry.units += weight;
+                else selected.set(key, { index, units: weight });
+            }
+            for (const [key, { index, units: selectedUnits }] of selected) {
+                const unit = this._contributions[index];
+                const feature = featureIndexOf(unit.source);
+                if (feature < 0) continue;
+                const entry = shares[feature] ??= {};
+                const share = { selectedUnits, totalUnits: totals.get(key) ?? selectedUnits };
+                const id = series?.get(unit.target);
+                if (id === undefined) {
+                    const current = entry.feature;
+                    if (!current || selectedUnits / share.totalUnits > current.selectedUnits / current.totalUnits) entry.feature = share;
+                } else {
+                    const list = entry.series ??= [];
+                    const i = list.findIndex(item => item.id === id);
+                    if (i < 0) list.push({ id, ...share });
+                    else if (selectedUnits / share.totalUnits > list[i].selectedUnits! / list[i].totalUnits!) list[i] = { id, ...share };
+                }
             }
         }
-        return Array.from(best.values());
+        return shares;
     }
 
     /**
@@ -381,21 +395,26 @@ export class ProvenanceModel {
      *
      * @returns Keys aligned with the contributions, and units per key.
      */
-    private shareIndex(): { keys: string[]; totals: Map<string, number> } {
-        if (this._shareIndex) return this._shareIndex;
+    private shareIndex(seriesByRow?: ReadonlyMap<ProvenanceId, string>): ShareIndex {
+        const cached = seriesByRow ? this._seriesShareIndexes.get(seriesByRow) : this._shareIndex;
+        if (cached) return cached;
         const stageOf = new Map<ProvenanceId, string>();
         for (const stage of this._stages) {
             for (const id of stage.ids) stageOf.set(id, stage.name);
         }
-        const keys: string[] = new Array(this._contributions.length);
+        const keys: (string | undefined)[] = new Array(this._contributions.length);
         const totals = new Map<string, number>();
         this._contributions.forEach((unit, index) => {
-            const key = tupleKey(unit.source, stageOf.get(unit.target) ?? '', unit.group ?? '');
+            const series = seriesByRow?.get(unit.target);
+            if (seriesByRow && series === undefined) return;
+            const key = tupleKey(unit.source, stageOf.get(unit.target) ?? '', unit.group ?? '', series ?? '');
             keys[index] = key;
             totals.set(key, (totals.get(key) ?? 0) + (unit.weight ?? 1));
         });
-        this._shareIndex = { keys, totals };
-        return this._shareIndex;
+        const result = { keys, totals };
+        if (seriesByRow) this._seriesShareIndexes.set(seriesByRow, result);
+        else this._shareIndex = result;
+        return result;
     }
 }
 

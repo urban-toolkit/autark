@@ -77,6 +77,61 @@ describe('Grouped line charts', () => {
         expect(parts[0].parentElement).toBe(proposal.parentElement);
     });
 
+    it('emits deduplicated feature shares by series and keeps linked overlays in their legend colors', () => {
+        const source = draw({ events: [PlotEvent.CLICK, PlotEvent.BRUSH_X] });
+        const target = draw();
+        const a = point(source.host, [0, 3], months[1]);
+        const b = point(source.host, [2, 4], months[1]);
+        const show = () => Array.from(target.host.querySelectorAll<SVGPathElement>('.autkPartialSeries'));
+        const fill = b.style.fill;
+        source.plot.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+            expect(selection).toEqual([2, 4]);
+            expect(shares).toEqual(Object.fromEntries(selection.map(id => [id, {
+                feature: { selectedUnits: 1, totalUnits: 3 },
+                series: [{ id: 'Proposal', selectedUnits: 1, totalUnits: 3 }],
+            }])));
+            target.plot.setSelection(selection, shares);
+        });
+        source.plot.setSelection([0, 2]);
+        b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(b.style.fill).toBe(fill);
+        expect([...source.host.querySelectorAll('.autkSeriesSelected')]).toEqual([b]);
+        source.plot.draw();
+        expect([...source.host.querySelectorAll('.autkSeriesSelected')]).toEqual([point(source.host, [2, 4], months[1])]);
+        expect(show().map(path => path.parentElement?.getAttribute('data-series'))).toEqual(['Proposal']);
+        source.plot.setSelection([]);
+
+        source.plot.events.on(PlotEvent.BRUSH_X, ({ selection, shares }) => {
+            expect([...selection].sort()).toEqual([0, 2, 3, 4]);
+            expect(shares?.[0]?.series).toEqual([{ id: 'Baseline', selectedUnits: 3, totalUnits: 3 }]);
+            target.plot.setSelection(selection, shares);
+        });
+        const instance = source.plot.instance as unknown as { _brushBehaviors: Map<string, d3.BrushBehavior<unknown>> };
+        instance._brushBehaviors.get('0')!.move(d3.select(source.host.querySelector<SVGGElement>('.autkBrush')!), [0, a.cx.baseVal.value * 2]);
+        expect(show()).toHaveLength(2);
+        for (const path of show()) {
+            const base = path.parentElement!.querySelector('.autk-line')!;
+            expect(path.style.stroke).toBe(d3.color(base.getAttribute('stroke')!)!.formatRgb());
+            expect(path.parentElement!.querySelector<SVGCircleElement>('.autkPartial')!.style.fill).toBe(path.style.stroke);
+        }
+        target.plot.setSelection([0, 2], { 0: { series: [{ id: 'Proposal' }] }, 2: { series: [{ id: 'Proposal' }] } });
+        expect(show().map(path => path.parentElement?.getAttribute('data-series'))).toEqual(['Proposal']);
+        target.plot.setSelection([]);
+        expect(show()).toHaveLength(0);
+    });
+
+    it('does not draw subset geometry for a grouped line configured for boolean highlight', () => {
+        const { plot, host } = draw({ provenance: { highlight: 'boolean' } });
+        plot.setSelection([0, 2], {
+            0: { series: [{ id: 'Proposal', selectedUnits: 1, totalUnits: 2 }] },
+            2: { series: [{ id: 'Proposal', selectedUnits: 1, totalUnits: 2 }] },
+        });
+        expect(host.querySelector('.autkPartial, .autkPartialSeries')).toBeNull();
+        const selected = [...host.querySelectorAll('.autkSeriesSelected')];
+        expect(selected).toHaveLength(3);
+        expect(selected.every(mark => mark.parentElement?.getAttribute('data-series') === 'Proposal')).toBe(true);
+    });
+
     it('leaves real gaps in the base and linked-highlight paths using observed or explicit bucket order', () => {
         const cases = [
             { collection: withoutFebruary(['Baseline']), domain: undefined },

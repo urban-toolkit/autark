@@ -3,7 +3,8 @@ import * as d3 from 'd3';
 import type { FeatureCollection } from 'geojson';
 import { ColorMapDomainStrategy } from '@urban-toolkit/autk-core';
 import { AutkPlot, PlotEvent, registerPlot, unregisterPlot } from '../src';
-import type { UnifiedPlotConfig } from '../src';
+import type { PlotEventData, UnifiedPlotConfig } from '../src';
+import { effectiveBox } from './svg-geometry';
 
 const collection: FeatureCollection = {
     type: 'FeatureCollection',
@@ -61,6 +62,11 @@ describe('Plot series', () => {
         const { value: y } = mark.cy.baseVal;
         brush.call(behavior.move, [[x - 6, y - 6], [x + 6, y + 6]]);
         expect(plot.selection).toEqual([1]);
+        plot.setSelection([1], { 1: { series: [{ id: '2025' }] } });
+        expect(mark.classList.contains('autkSeriesSelected')).toBe(false);
+        plot.setSelection([1], { 1: { series: [{ id: '2026', selectedUnits: 1, totalUnits: 4 }] } });
+        expect(mark.classList.contains('autkSeriesSelected')).toBe(true);
+        expect(host.querySelector('.autkPartial')).toBeNull();
     });
 
     it('reserves grouped bar slots across filters and keeps palette order separate from geometry', () => {
@@ -73,14 +79,65 @@ describe('Plot series', () => {
         const [first, second] = bars;
         expect(first.x.baseVal.value + first.width.baseVal.value).toBeLessThanOrEqual(second.x.baseVal.value + 0.01);
         expect(second.style.fill).toBe('rgb(255, 0, 0)');
-        let selection: number[] = [];
-        plot.events.on(PlotEvent.CLICK, event => { selection = event.selection; });
+        let clicked: PlotEventData | undefined;
+        plot.events.on(PlotEvent.CLICK, event => { clicked = event; });
         second.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        expect(selection).toEqual([1]);
+        expect(clicked).toEqual({ selection: [1], shares: { 1: { series: [{ id: '2026' }] } } });
         const filtered = draw({ ...config, filter: { attribute: 'group', op: '==', value: '2026' } }).host;
         expect(filtered.querySelector('rect.autkMark')?.getAttribute('x')).toBe(second.getAttribute('x'));
         const windowed = draw({ ...config, scales: { x: { domain: ['South'] } } }).host;
         expect(Array.from(windowed.querySelectorAll('.autk-legend text'), text => text.textContent)).toEqual(['2026']);
+    });
+
+    it.each(['scatterplot', 'bubble', 'barchart'] as const)('uses matching series coverage and boolean membership in %s', type => {
+        const axis = type === 'barchart' ? ['category', 'y'] : type === 'bubble' ? ['x', 'y', 'y'] : ['x', 'y'];
+        const { host, plot } = draw({ type, attributes: { axis, series: 'group' } });
+        const mark = (id: number) => host.querySelector<SVGGraphicsElement>(`.autkMark[data-autk-provenance="mark:feature:${id}"]`)!;
+        const fill = mark(0).style.fill;
+        plot.setSelection([0, 1, 2], {
+            0: { feature: { selectedUnits: 3, totalUnits: 3 }, series: [
+                { id: '2025', selectedUnits: 1, totalUnits: 4 }, { id: '2026', selectedUnits: 2, totalUnits: 2 },
+            ] },
+            1: { feature: { selectedUnits: 1, totalUnits: 5 }, series: [{ id: '2026' }] },
+            2: { feature: { selectedUnits: 1, totalUnits: 4 }, series: [{ id: '2025' }] },
+        });
+        const partials = host.querySelectorAll<SVGGraphicsElement>('.autkPartial');
+        expect(partials).toHaveLength(1);
+        expect(partials[0].getAttribute('data-autk-provenance')).toBe('mark:feature:0');
+        expect(partials[0].getAttribute('data-autk-units')).toBe('1/4');
+        expect(partials[0].style.fill).toBe(fill);
+        expect(effectiveBox(partials[0])!.height / effectiveBox(mark(0))!.height).toBeCloseTo(type === 'barchart' ? 0.25 : 0.5);
+        expect(mark(1).classList.contains('autkSeriesSelected')).toBe(true);
+        expect(mark(2).classList.contains('autkSeriesSelected')).toBe(false);
+
+        plot.setSelection([2], { 0: { feature: { selectedUnits: 1, totalUnits: 2 } } });
+        expect(host.querySelector('.autkPartial')).toBeNull();
+        expect(mark(2).classList.contains('autkSeriesSelected')).toBe(true);
+        plot.setSelection([]);
+        expect(host.querySelector('.autkSeriesSelected, .autkPartial')).toBeNull();
+    });
+
+    it('gives custom partial renderers only matching parts and the row colors', () => {
+        let parts: string[][] = [];
+        registerPlot({
+            name: 'group-test', series: true,
+            draw({ group, rows }) {
+                group.selectAll('circle').data(rows).join('circle').attr('class', 'autkMark')
+                    .attr('r', 5).attr('cx', (_, i) => 20 + i * 12).attr('cy', 20);
+            },
+            highlight({ parts: selected, colorOf, drawAuto }) {
+                parts = selected.map(part => [part.mark, d3.color(colorOf(part.datum))!.formatRgb()]);
+                drawAuto();
+            },
+        });
+        const { plot, host } = draw({ type: 'registered', plot: 'group-test', attributes: { axis: ['x'], series: 'group' } });
+        const color = host.querySelector<SVGCircleElement>('.autkMark')!.style.fill;
+        plot.setSelection([0, 1], {
+            0: { series: [{ id: '2025', selectedUnits: 1, totalUnits: 2 }] },
+            1: { series: [{ id: '2025', selectedUnits: 1, totalUnits: 2 }] },
+        });
+        expect(parts).toEqual([['mark:feature:0', color]]);
+        expect(host.querySelectorAll('.autkPartial')).toHaveLength(1);
     });
 
     it('rejects unsupported configurations, repeated bar pairs, and invalid values', () => {

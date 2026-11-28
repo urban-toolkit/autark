@@ -154,7 +154,7 @@ describe('sankey with flows (segments make link provenance exact)', () => {
                 .dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
             expect(sortNumbers(plot.selection)).toEqual(sortNumbers(row.autkIds));
-            expect(emitted[0].shares!.every(s => s.selectedUnits === 1 && s.totalUnits === 1), kind).toBe(true);
+            expect(Object.values(emitted[0].shares!).every(s => s?.feature?.selectedUnits === 1 && s.feature.totalUnits === 1), kind).toBe(true);
         }
     });
 
@@ -162,8 +162,8 @@ describe('sankey with flows (segments make link provenance exact)', () => {
         const { plot } = mount(sankey());
         const columnOne = rowsOf(plot).filter(r => r.kind === 'node' && r.column === 1).map(r => `node:${r.key}`);
         const shares = plot.provenance.featureShares(columnOne);
-        expect(shares).toHaveLength(38);
-        expect(shares.every(s => s.selectedUnits === s.totalUnits)).toBe(true);
+        expect(Object.keys(shares)).toHaveLength(38);
+        expect(Object.values(shares).every(s => s?.feature && s.feature.selectedUnits === s.feature.totalUnits)).toBe(true);
     });
 
     test('non-additive reducers are rejected', () => {

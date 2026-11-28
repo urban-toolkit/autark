@@ -52,7 +52,7 @@ const landuse = () => loadGalleryCollection('mnt_neighs_proj_landuse.geojson');
 const events = () => withSyntheticEvents(landuse());
 const series = () => withSyntheticSeries(landuse());
 const half = (collection: Collection) => collection.features.map((_f, i) => i).filter(i => i % 2 === 0);
-const halfShares = (collection: Collection) => collection.features.map((_f, feature) => ({ feature, selectedUnits: 1, totalUnits: 3 }));
+const halfShares = (collection: Collection) => Object.fromEntries(half(collection).map(id => [id, { feature: { selectedUnits: 1, totalUnits: 3 } }]));
 
 type Step =
     | { kind: 'click-mark'; index: number }
@@ -670,7 +670,7 @@ type Snapshot = {
     axes: { id: string; ticks: string[]; label: string | null }[];
     title: string | null;
     selection: number[];
-    emitted: { event: string; selection: number[]; shares: number[][] | null }[];
+    emitted: { event: string; selection: number[]; shares: [id: number, selectedUnits: number, totalUnits: number][] | null }[];
     path: string | null;
     /** Lines and areas of the selected subset: path commands, rounded coordinates, and style. */
     series?: { commands: string; numbers: number[]; fill: string | null; stroke: string | null }[];
@@ -702,9 +702,9 @@ function replay(testCase: Case): Snapshot[] {
         plot.events.on(event, (data: PlotEventData) => emitted.push({
             event,
             selection: [...data.selection].sort((a, b) => a - b),
-            shares: data.shares
-                ? [...data.shares].sort((a, b) => a.feature - b.feature).map(s => [s.feature, round(s.selectedUnits), round(s.totalUnits)])
-                : null,
+            // Record the coverage of the ungrouped native cases as compact numeric tuples.
+            shares: data.shares ? Object.entries(data.shares).flatMap(([id, entry]) => entry?.feature
+                ? [[Number(id), round(entry.feature.selectedUnits), round(entry.feature.totalUnits)]] : []) : null,
         }));
     }
 
@@ -828,6 +828,28 @@ function near(actual: unknown, expected: unknown): unknown {
  * `fill` on rows, which draws nothing on an HTML element.
  */
 function accepted(name: string, snapshots: Snapshot[], actual: Snapshot[]): Snapshot[] {
+    // The old fixture supplied coverage for all rows, even those not selected.
+    // Only the selected rows now show a part; keep their recorded geometry.
+    let inverse = false;
+    for (const snapshot of snapshots) {
+        if (snapshot.step.includes('"kind":"select"')) inverse = snapshot.step.includes('"shares":"third"');
+        if (!inverse || !snapshot.selection.length) continue;
+        const selected = new Set(snapshot.selection);
+        const isSelected = (id: string | null) => selected.has(Number(id?.match(/^mark:(?:feature|kept|row):(\d+)$/)?.[1]));
+        snapshot.partials = snapshot.partials.filter(part => isSelected(part.id));
+        if (name.startsWith('table:')) {
+            const initialById = new Map(snapshots[0].marks.map(mark => [mark.id, mark]));
+            snapshot.marks = snapshot.marks.map(mark => isSelected(mark.id) ? mark : initialById.get(mark.id) ?? mark);
+        }
+        if (name.startsWith('scatterplot:') && snapshot.path) {
+            const n = snapshot.partials.length - 3;
+            snapshot.path = snapshot.path.replace(/(?<=filter: landuse != Mixed).*$/, `filtered parts: 3 shown · +${n}`);
+            const now = actual[snapshots.indexOf(snapshot)];
+            if (now.path?.match(/: 1\/3 · /g)?.length === 3 && now.path.endsWith(` · +${n}`)) {
+                now.path = now.path.replace(/(?<=filter: landuse != Mixed).*$/, `filtered parts: 3 shown · +${n}`);
+            }
+        }
+    }
     // A table keeps its rows in place when a row is selected, so order is not part of the snapshot.
     if (name.startsWith('table:')) {
         for (const list of [snapshots, actual]) {

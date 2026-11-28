@@ -168,9 +168,9 @@ export type PlotArrangeContext = {
  * and how to draw it again through the selected parts.
  */
 export type PlotSeries = {
-    /** The drawn path; the part of the series takes its style, in the highlight color. */
+    /** The drawn path; the partial path uses its style and, when grouped, its series color. */
     element: SVGPathElement;
-    /** Rows of the series, in drawing order. */
+    /** Rows of this path, in drawing order. In grouped plots, use one input series per path. */
     rows: AutkDatum[];
     /**
      * Path of the series with `value(row)` in place of each row's value: the
@@ -195,8 +195,10 @@ export type PlotHighlightContext = {
     parts: SegregatedPart[];
     /** Mark elements of a row. */
     marksOf: (row: AutkDatum) => SVGGraphicsElement[];
-    /** Color of the selected part. */
+    /** Default color of the selected part. */
     color: string;
+    /** Selected part color for a row, preserving its series color when grouped. */
+    colorOf: (row: AutkDatum) => string;
     /** Draws the parts with the inferred highlight (or the one `draw` returns), for a function that adds to them. */
     drawAuto: () => void;
 };
@@ -680,10 +682,12 @@ export class RegisteredPlot extends PlotBaseInteractive {
     }
 
     protected override afterDataRefresh(): void {
-        super.afterDataRefresh();
         if (this._seriesField !== undefined && !this._transformConfig) {
             this._inputSeries = resolveSeries(this._seriesField, this._sourceFeatures, this._data, this._style?.colorMap);
         }
+        this._seriesByRowId = this._inputSeries && new Map(this._inputSeries.groups.flatMap(group =>
+            group.rows.map(row => [this.rowIdOf(row)!, group.key] as const)));
+        super.afterDataRefresh();
     }
 
     /** Lets the definition adjust a numeric color domain computed from the data. */
@@ -703,13 +707,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
         return this.definition?.colorAttribute;
     }
 
-    /** Restores the series or definition color when a mark is no longer highlighted. */
+    /** Series identity stays visible even when a mark is selected. */
     protected override getMarkColor(d: unknown): string {
-        if ((this._inputSeries || this._baseColor) && !this.isMarkHighlighted(d)) {
-            const seriesColor = this._inputSeries?.colorByRow.get(d as AutkDatum);
-            if (seriesColor !== undefined) return seriesColor;
-            if (this._baseColor && !this.renderColorAttribute) return this._baseColor(d as AutkDatum);
-        }
+        const seriesColor = this._inputSeries?.colorByRow.get(d as AutkDatum);
+        if (seriesColor !== undefined) return seriesColor;
+        if (this._baseColor && !this.renderColorAttribute && !this.isMarkHighlighted(d)) return this._baseColor(d as AutkDatum);
         return super.getMarkColor(d);
     }
 
@@ -736,6 +738,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
             // A drag over labels brushes instead of selecting their text.
             .style('user-select', 'none');
         svg.selectAll('*').remove();
+        if (this._inputSeries) svg.append('style').text(`
+            svg .autkSeriesSelected { filter: drop-shadow(0 0 1px #17212b) drop-shadow(0 0 1px #17212b); }
+            .autk-registered-html .autkSeriesSelected { outline: 2px solid #17212b; outline-offset: -2px; }
+        `);
         const html = d3.select(this._div).selectChildren<HTMLDivElement, number>('div.autk-registered-html')
             .data([0]).join('div')
             .attr('class', 'autk-registered-html')
@@ -1077,10 +1083,10 @@ export class RegisteredPlot extends PlotBaseInteractive {
         super.applyMarkStyles(marks.filter((_d, i, nodes) => nodes[i] instanceof SVGElement));
         // HTML marks: a highlighted background, with text that stays readable on it.
         marks.filter((_d, i, nodes) => !(nodes[i] instanceof SVGElement))
-            .style('background-color', d => (this.isMarkHighlighted(d)
-                ? this.highlightColor
-                : this._inputSeries || this.renderColorAttribute ? this.getMarkColor(d) : 'transparent'))
-            .style('color', d => (this.isMarkHighlighted(d) ? PlotStyle.provenanceText : null));
+            .style('background-color', d => (this._inputSeries || this.renderColorAttribute || this.isMarkHighlighted(d)
+                ? this.getMarkColor(d) : 'transparent'))
+            .style('color', d => (!this._inputSeries && this.isMarkHighlighted(d) ? PlotStyle.provenanceText : null));
+        if (this._inputSeries) marks.classed('autkSeriesSelected', d => this.isMarkHighlighted(d));
         const style = this.definition?.markStyle;
         if (style) {
             marks.each((d, i, nodes) => {
@@ -1190,6 +1196,11 @@ export class RegisteredPlot extends PlotBaseInteractive {
         return true;
     }
 
+    protected override get segregatedActive(): boolean {
+        if (this._inputSeries && (this._booleanHighlight || this.definition.highlight === 'boolean')) return false;
+        return super.segregatedActive;
+    }
+
     /** Rows have the label and value the top-k cut needs when the plot reads them. */
     protected override supportsTopK(): boolean {
         return true;
@@ -1222,6 +1233,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         if (typeof own === 'function' && !this._booleanHighlight) {
             own({
                 group, parts, marksOf: row => marks.get(row) ?? [], color: this.highlightColor,
+                colorOf: row => this._inputSeries?.colorByRow.get(row) ?? this.highlightColor,
                 drawAuto: () => this.drawAutoParts(group, parts, marks),
             });
             group.selectAll('.autkPartial').style('pointer-events', 'none');
@@ -1287,19 +1299,26 @@ export class RegisteredPlot extends PlotBaseInteractive {
                     membersByRow = d3.group(this._provenance.contributions.filter(unit => features.has(unit.source)), unit => unit.target);
                 }
                 const rowId = this.rowIdOf(part.datum);
-                return (rowId === undefined ? [] : membersByRow.get(rowId) ?? [])
+                const members = (rowId === undefined ? [] : membersByRow.get(rowId) ?? [])
                     .map(unit => ({ feature: Number(unit.source.slice('feature:'.length)), value: unit.value }));
+                if (!this._inputSeries || options.series === false) return members;
+                const eligible = this.externalFeaturesOf(part.datum);
+                return members.filter(member => eligible.has(member.feature));
             },
         };
         this._moved = [];
         for (const part of parts) {
-            for (const mark of marks.get(part.datum) ?? []) this.copyPart(mark, part, designs, context, writes);
+            const seriesColor = options.series === false ? undefined : this._inputSeries?.colorByRow.get(part.datum);
+            const partContext = seriesColor === undefined ? context : {
+                ...context, color: seriesColor, outline: '#17212b', selected: this.externalFeaturesOf(part.datum),
+            };
+            for (const mark of marks.get(part.datum) ?? []) this.copyPart(mark, part, designs, partContext, writes, seriesColor !== undefined);
         }
         for (const write of writes) write();
         if (options.series === false) return;
         const partOf = new Map(parts.map(part => [part.datum as object, part]));
         if (this._series.length > 0) this.drawPlotSeries(partOf);
-        else this.drawSeries(group, marks, partOf, designs);
+        else if (!this._inputSeries) this.drawSeries(group, marks, partOf, designs);
         // Moved points stay over the series drawn through them; traced lines over the lines they cross.
         for (const point of this._moved) point.parentNode?.appendChild(point);
     }
@@ -1353,29 +1372,34 @@ export class RegisteredPlot extends PlotBaseInteractive {
         for (const series of this._series) {
             if (!series.rows.some(row => partOf.has(row))) continue;
             if ((series.area ?? isFilled(series.element)) && !additive) continue;
+            const first = series.rows[0];
+            // A single path across unrelated groups has no series style or safe geometry.
+            const grouped = this._seriesByRowId;
+            const key = grouped?.get(this.rowIdOf(first)!);
+            if (grouped && (key === undefined || series.rows.some(row => grouped.get(this.rowIdOf(row)!) !== key))) continue;
             const d = series.path(row => {
                 const part = partOf.get(row);
                 return part ? part.part.value : additive ? 0 : null;
             });
-            if (d) this.appendSeriesPart(series.element, d);
+            if (d) this.appendSeriesPart(series.element, d, this._inputSeries?.colorByRow.get(first));
         }
     }
 
     /**
-     * Inserts the part of a series: the series' style in the highlight color,
-     * under the point marks drawn through it.
+     * Inserts the subset path under its points, using a heavier stroke for grouped series.
      */
-    private appendSeriesPart(series: SVGPathElement, d: string): void {
+    private appendSeriesPart(series: SVGPathElement, d: string, color?: string): void {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('class', 'autkPartialSeries');
         path.setAttribute('d', d);
         const filled = isFilled(series);
         const stroke = series.style.stroke || series.getAttribute('stroke');
-        path.style.setProperty('fill', filled ? this.highlightColor : 'none');
+        path.style.setProperty('fill', filled ? color ?? this.highlightColor : 'none');
         if (filled) path.style.setProperty('fill-opacity', series.style.fillOpacity || series.getAttribute('fill-opacity') || '1');
-        if (stroke && stroke !== 'none') {
-            path.style.setProperty('stroke', this.highlightColor);
-            path.style.setProperty('stroke-width', series.style.strokeWidth || series.getAttribute('stroke-width') || '1');
+        if (color || (stroke && stroke !== 'none')) {
+            const width = series.style.strokeWidth || series.getAttribute('stroke-width') || '1';
+            path.style.setProperty('stroke', color ?? this.highlightColor);
+            path.style.setProperty('stroke-width', color ? String((parseFloat(width) || 1) + 1.5) : width);
         }
         path.style.setProperty('pointer-events', 'none');
         const parent = series.parentNode;
@@ -1427,6 +1451,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
         designs: Map<MarkKind, HighlightDesign>,
         context: AutoPartContext,
         writes: (() => void)[],
+        grouped: boolean,
     ): void {
         const own = mark.getAttribute('data-autk-highlight');
         if (own === 'none') return;
@@ -1447,6 +1472,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
                 host.style.setProperty('background-image', fill);
                 host.setAttribute('data-autk-filled', String(part.fraction));
                 host.setAttribute('data-autk-units', `${part.part.selectedUnits}/${part.part.totalUnits}`);
+                if (grouped) host.classList.add('autkSeriesSelected');
             });
             return;
         }
@@ -1477,6 +1503,12 @@ export class RegisteredPlot extends PlotBaseInteractive {
         }
 
         const drawn = drawAutoPart(mark, part, design, copy, context, statistic !== null);
+        if (grouped) {
+            for (const element of drawn) {
+                if (property === 'fill' && rule !== 'trace') outline(element, context.outline);
+                else element.classList.add('autkSeriesSelected');
+            }
+        }
         // Moved points and traced lines are drawn over the marks they cross.
         if (rule === 'position' || rule === 'trace') this._moved.push(...drawn);
         writes.push(() => {
@@ -1593,7 +1625,7 @@ export class RegisteredPlot extends PlotBaseInteractive {
      */
     checkParts(): ContractViolation[] | null {
         const half = this._sourceFeatures.map((_f, i) => i).filter(i => i % 2 === 0);
-        const shares = this._sourceFeatures.map((_f, feature) => ({ feature, selectedUnits: 1, totalUnits: 2 }));
+        const shares = Object.fromEntries(half.map(id => [id, { feature: { selectedUnits: 1, totalUnits: 2 } }]));
         this.setSelection(half, shares);
         // Only rows drawn as marks show a part; context rows do not.
         const marked = new Set<unknown>();

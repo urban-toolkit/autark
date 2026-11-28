@@ -112,8 +112,9 @@ describe('a transform registered outside the core: moving average', () => {
 
         // A region's share: events within 3 days of the selected day, over all its spread inside the range.
         const day = Math.floor(new Date(`${rows()[index].bucket}T00:00:00Z`).getTime() / DAY);
-        for (const share of emitted[0].shares!) {
-            const own = (withEvents().features[share.feature].properties!.sjoin.collect.noise as { date: string }[])
+        for (const [id, entry] of Object.entries(emitted[0].shares!)) {
+            const share = entry!.feature!;
+            const own = (withEvents().features[Number(id)].properties!.sjoin.collect.noise as { date: string }[])
                 .map(e => Math.floor(new Date(e.date).getTime() / DAY));
             const inWindow = own.filter(d => Math.abs(d - day) <= 3).length;
             expect(share.selectedUnits / share.totalUnits).toBeGreaterThan(0);

@@ -117,7 +117,7 @@ map.loadTerrain({ source: { collection: await db.getRaster('elevation'), propert
   attributes: { axis: ['hourly'], series: 'group' },
   transform: { preset: 'reduce-series', options: { reducer: 'sum' } },
   scales: { x: { domain: hours } },
-  events: [PlotEvent.CLICK, PlotEvent.BRUSH],
+  events: [PlotEvent.CLICK, PlotEvent.BRUSH_X],
 });
 timeline.setAnnotations([
   { id: 'overnight', type: 'band', x: [hours[0], hours[5]], label: 'Overnight' },
@@ -125,19 +125,35 @@ timeline.setAnnotations([
   { id: 'peak', type: 'point', series: 'Weekends', x: hours[peak], label: 'Weekend peak' },
 ]);
 // The hexbin and line chart share original report indexes, not aggregate rows.
-timeline.events.on(PlotEvent.BRUSH, ({ selection }) => locations.setSelection(selection));
-locations.events.on(PlotEvent.CLICK, ({ selection }) => timeline.setSelection(selection));`;
-        case 'P11': return `const timeline = new AutkPlot(timelineHost, {
-  type: 'linechart', collection: profile(trips),
+for (const event of [PlotEvent.CLICK, PlotEvent.BRUSH_X] as const) {
+  timeline.events.on(event, ({ selection, shares }) => locations.setSelection(selection, shares));
+}
+locations.events.on(PlotEvent.CLICK, ({ selection, shares }) => timeline.setSelection(selection, shares));`;
+        case 'P11': return `const points = profile(trips);
+const timeline = new AutkPlot(timelineHost, {
+  type: 'linechart', collection: points,
   attributes: { axis: ['series'], series: 'airport' },
   transform: { preset: 'reduce-series' },
   scales: { x: { domain: hourBuckets } },
-  events: [PlotEvent.BRUSH_X],
+  events: [PlotEvent.CLICK, PlotEvent.BRUSH_X],
+});
+// A point identifies one airport and hour; an X brush compares both airports.
+timeline.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+  const selected = new Map<string, Set<number>>();
+  for (const id of selection) {
+    const hour = hours.indexOf(points.features[id].properties.hour);
+    for (const { id: airport } of shares?.[id]?.series ?? []) {
+      const set = selected.get(airport) ?? new Set<number>();
+      set.add(hour);
+      selected.set(airport, set);
+    }
+  }
+  showHours(selection.length ? selected : null);
 });
 timeline.events.on(PlotEvent.BRUSH_X, ({ extent }) => {
   const x = extent?.data?.x;
   const selected = x?.kind === 'categorical' ? new Set(x.keys.map(key => hourBuckets.indexOf(key))) : null;
-  histogram.updateCollection(distribution(trips, selected));
+  showHours(selected && new Map(groups.map(id => [id, selected])));
 });`;
         case 'P12': return `// Use the same numeric domains in both cohorts for a fair comparison.
 const weekday = new AutkPlot(weekdayHost, {
@@ -151,7 +167,13 @@ weekday.setAnnotations([
 // The hourly view stores weekday trips first; weekend IDs are offset accordingly.
 weekday.events.on(PlotEvent.BRUSH, ({ selection }) => hourly.setSelection(selection));
 weekend.events.on(PlotEvent.BRUSH, ({ selection }) =>
-  hourly.setSelection(selection.map(id => id + weekdayTrips.features.length)));`;
+  hourly.setSelection(selection.map(id => id + weekdayTrips.features.length)));
+hourly.events.on(PlotEvent.CLICK, ({ selection, shares }) => {
+  const offset = weekdayTrips.features.length;
+  const ids = selection.filter(id => id >= offset);
+  const localShares = shares && Object.fromEntries(ids.map(id => [id - offset, shares[id]]));
+  weekend.setSelection(ids.map(id => id - offset), localShares);
+});`;
         case 'P01': return plot('barchart', "{ axis: ['ntaname', 'shape_area'] }", 'CLICK');
         case 'P02': return plot('scatterplot', "{ axis: ['shape_area', 'shape_leng'] }", 'BRUSH');
         case 'P03': return plot('barchart', "{ axis: ['shape_area', '@transform'] }", 'BRUSH_X', "{ preset: 'binning-1d', options: { bins: 10 } }");

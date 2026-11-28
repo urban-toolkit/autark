@@ -62,6 +62,22 @@ describe('Grouped reduce-series', () => {
         });
     });
 
+    it('reports independent weighted coverage when the same feature contributes to two series', () => {
+        const targets = ['jfk-picked', 'jfk-rest', 'lga-picked', 'lga-rest'];
+        const source = featureId(12);
+        const model = new ProvenanceModel([
+            { name: 'D0', label: 'features', ids: [source] },
+            { name: 'D1', label: 'buckets', ids: targets },
+        ], [], targets.map((target, i) => ({ source, target, weight: [0.25, 0.75, 1, 1][i], value: 1 })));
+        const series = new Map(targets.map((target, i) => [target, i < 2 ? 'JFK' : 'LaGuardia']));
+        expect(model.featureShares([targets[0], targets[2], targets[2]], series)).toEqual({
+            12: {
+                feature: { selectedUnits: 1.25, totalUnits: 3 },
+                series: [{ id: 'JFK', selectedUnits: 0.25, totalUnits: 1 }, { id: 'LaGuardia', selectedUnits: 1, totalUnits: 2 }],
+            },
+        });
+    });
+
     it('keeps row and point IDs stable when other groups or features are filtered out', () => {
         const full = runGroupedReduceSeries(groups, {}, ['monthly']);
         const { groups: filtered } = resolveSeries('scenario', features, kept.filter(row => row.autkIds[0] === 5));

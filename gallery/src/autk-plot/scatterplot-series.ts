@@ -43,7 +43,7 @@ async function main(): Promise<() => void> {
         margins: { top: 38, right: 20, bottom: 62, left: 58 },
         style: { colorMap: { type: 'categorical', colors: ['#126a82', '#aa4619'],
             domainSpec: { type: ColorMapDomainStrategy.USER, params: [...groups] } } },
-        events: [PlotEvent.CLICK, PlotEvent.BRUSH],
+        events: [PlotEvent.CLICK, PlotEvent.BRUSH_X],
     });
     const locations = new AutkPlot(document.querySelector<HTMLElement>('#noiseLocations')!, {
         type: 'hexbin', collection, width: 'auto', height: 360,
@@ -65,10 +65,10 @@ async function main(): Promise<() => void> {
         { id: 'peak', type: 'point', series: 'Weekends', x: hours[peak], label: 'Weekend peak' },
     ]);
     document.querySelector<HTMLElement>('[data-example-status]')!.textContent = `${days.get('Weekdays')} weekdays · ${days.get('Weekends')} weekend days`;
-    for (const event of [PlotEvent.CLICK, PlotEvent.BRUSH] as const) {
-        timeline.events.on(event, ({ selection }) => locations.setSelection(selection));
+    for (const event of [PlotEvent.CLICK, PlotEvent.BRUSH_X] as const) {
+        timeline.events.on(event, ({ selection, shares }) => locations.setSelection(selection, shares));
     }
-    locations.events.on(PlotEvent.CLICK, ({ selection }) => timeline.setSelection(selection));
+    locations.events.on(PlotEvent.CLICK, ({ selection, shares }) => timeline.setSelection(selection, shares));
     return () => { timeline.destroy(); locations.destroy(); };
 }
 

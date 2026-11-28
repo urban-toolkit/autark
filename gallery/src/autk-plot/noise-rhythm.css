@@ -1,6 +1,11 @@
 .noise-story .noise-method { margin: 16px 0 26px; font-size: 13px; color: #425765; }
 .noise-story .details-panel > .panel-header { background: #eef5f6; }
 .noise-story .details-panel > .plot-body { padding: 8px; }
+/* A brush range already signals selection. D3 removes its width when cleared. */
+#noiseTimeline:not(:has(.autkBrush > .selection[width])):has(.autkPartialSeries, .autkMark.autkSeriesSelected)
+    :is(.autk-line, circle.autkMark:not(.autkSeriesSelected)) {
+    opacity: 0.25;
+}
 @media (min-width: 901px) {
     .gallery-example.noise-story #app.chart-workspace { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
 }

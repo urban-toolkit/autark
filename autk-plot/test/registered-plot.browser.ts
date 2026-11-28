@@ -141,7 +141,7 @@ describe('interactions come from the annotations', () => {
         plot.events.on(autkPlot.PlotEvent.CLICK, data => { emitted = data; });
         marks()[0].dispatchEvent(new MouseEvent('click'));
         expect(emitted!.selection.sort((a, b) => a - b)).toEqual([...rows()[0].autkIds!].sort((a, b) => a - b));
-        expect(emitted!.shares).toHaveLength(rows()[0].autkIds!.length);
+        expect(Object.keys(emitted!.shares!)).toHaveLength(rows()[0].autkIds!.length);
     });
 
     test('mark colors follow the selection on the mark element', () => {
@@ -233,7 +233,7 @@ describe('segregated view without painting code', () => {
     test('one-to-one marks show the share sent by the emitting view', () => {
         register(DOTS);
         const { plot, partials } = mount({ plot: 'dots', attributes: { axis: ['shape_area'] } });
-        plot.setSelection([3], [{ feature: 3, selectedUnits: 1, totalUnits: 4 }]);
+        plot.setSelection([3], { 3: { feature: { selectedUnits: 1, totalUnits: 4 } } });
         expect(partials()).toHaveLength(1);
         expect(Number(/scale\(([^)]+)\)/.exec(partials()[0].getAttribute('transform')!)![1])).toBeCloseTo(0.5, 12);
     });

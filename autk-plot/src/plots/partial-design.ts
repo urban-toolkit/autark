@@ -734,7 +734,7 @@ export type AutoPartContext = {
     /** Color of the outline added to parts that the fill does not set apart. */
     outline: string;
     /** Selected features, for the `units` rule. */
-    selected: Set<number>;
+    selected: ReadonlySet<number>;
     /** Class of the part elements (defaults to `autkPartial`). */
     className?: string;
     /** Selected features of a part with their values, for the `members` rule. */

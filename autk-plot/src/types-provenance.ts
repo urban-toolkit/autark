@@ -125,13 +125,20 @@ export type ProvenancePath = {
  * density interval covering 37% of a feature's kernel mass gives `0.37/1`.
  */
 export type FeatureShare = {
-    /** Source feature index. */
-    feature: number;
     /** Units of the feature reduced into the selected rows, weighted. */
     selectedUnits: number;
-    /** All units of the feature reduced into any rendered row, weighted. */
+    /** Total weighted units in the scope used to compute the share. */
     totalUnits: number;
 };
+
+/** Selected series key, with coverage when the emitting plot aggregates contributions. */
+export type SeriesShare = { id: string } & (FeatureShare | { selectedUnits?: never; totalUnits?: never });
+
+/** Feature-level coverage and selected series, keyed by source feature index. */
+export type SelectionShares = Partial<Record<number, {
+    feature?: FeatureShare;
+    series?: SeriesShare[];
+}>>;
 
 /**
  * Share of one rendered row produced by a set of selected source features.

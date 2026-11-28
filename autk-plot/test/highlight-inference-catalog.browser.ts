@@ -216,9 +216,10 @@ function evaluate(type: Exclude<PlotType, 'registered'>): Row {
     };
     const designs = geometry.inferHighlight(marks, valueOf, instance.aggregatesRows, instance._colorProperty);
 
-    const half = data.features.map((_f, i) => i).filter(i => i % 2 === 0);
-    if (instance.aggregatesRows) plot.setSelection(half);
-    else plot.setSelection(half, data.features.map((_f, feature) => ({ feature, selectedUnits: 1, totalUnits: 2 })));
+    const ids = data.features.map((_f, i) => i);
+    const selected = instance.aggregatesRows ? ids.filter(i => i % 2 === 0) : ids;
+    if (instance.aggregatesRows) plot.setSelection(selected);
+    else plot.setSelection(selected, Object.fromEntries(selected.map(id => [id, { feature: { selectedUnits: 1, totalUnits: 2 } }])));
     const parts = new Map(instance.segregatedParts().map(p => [p.mark, p]));
 
     const families = designs.map(design => ({ design, measured: 0, agreed: 0, near: 0 }));
@@ -234,7 +235,7 @@ function evaluate(type: Exclude<PlotType, 'registered'>): Row {
         if (!family) continue;
         family.measured += 1;
         const unitValue = (feature: number) => instance._provenance.contributions.find(u => u.target === id!.slice('mark:'.length) && u.source === `feature:${feature}`)?.value ?? NaN;
-        const check = () => agrees(mark, partial, family.design, geometry.ratioOf(part, geometry.ruleOf(family.design)), new Set(half), unitValue);
+        const check = () => agrees(mark, partial, family.design, geometry.ratioOf(part, geometry.ruleOf(family.design)), new Set(selected), unitValue);
         tolerance = EXACT;
         if (check()) family.agreed += 1;
         tolerance = NEAR;

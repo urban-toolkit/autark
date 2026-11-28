@@ -1,7 +1,7 @@
 import type { SelectionData } from '@urban-toolkit/autk-core';
 
 import type { AutkDatum } from './types-plot';
-import type { FeatureShare } from './types-provenance';
+import type { SelectionShares } from './types-provenance';
 
 /**
  * Interaction events emitted by plot instances.
@@ -38,11 +38,11 @@ export enum PlotEvent {
  */
 export type PlotEventData = SelectionData & {
     /**
-     * Share of each selected feature covered by the selected marks. Present when
-     * the plot aggregates rows, so a receiving one-to-one plot can draw only
-     * that part of each feature's mark.
+     * Selected series and/or coverage of each selected feature, keyed by source
+     * feature index. A receiving plot can restrict matches to selected series
+     * and draw partial marks when coverage is available.
      */
-    shares?: FeatureShare[];
+    shares?: SelectionShares;
     /** Present on brush events; `null` means the emitting brush was cleared. */
     extent?: BrushExtent | null;
 };
